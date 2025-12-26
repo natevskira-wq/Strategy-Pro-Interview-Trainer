@@ -3,73 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Interview Strategist (Audio Enabled)</title>
+    <title>German Interview Master (Complete)</title>
     
-    <!-- 1. LIBRARIES -->
+    <!-- LIBRARIES -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
 
-    <!-- 2. SCRIPTS -->
+    <!-- LOGIC -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
     <style>
-        /* --- GLOBAL LAYOUT --- */
+        /* --- GLOBAL --- */
         body { margin: 0; padding: 0; height: 100vh; overflow: hidden; font-family: 'Inter', sans-serif; }
         #app { display: flex; height: 100%; width: 100%; transition: background 0.2s ease; }
+        #myBoard { width: 100%; }
         
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 4px; }
 
-        /* Chessboard Logic */
-        #myBoard { width: 100%; }
-/* FORCE TEXT BACKGROUND REMOVAL */
-.editor-input, .editor-input * {
-    background-color: transparent !important;
-}
+        /* --- UI COMPONENTS --- */
+        .tab-btn { padding: 12px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; opacity: 0.6; transition: all 0.2s; font-size: 0.85rem; }
+        .tab-btn.active { opacity: 1; border-bottom-color: currentColor; }
 
-        /* --- BLINDFOLD MASK --- */
         .blindfold-mask {
-            position: absolute; inset: 0; 
-            background: #e2e8f0; color: #64748b;
+            position: absolute; inset: 0; background: #e2e8f0; color: #64748b;
             display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 0.9rem;
-            cursor: pointer; z-index: 20; border-radius: 6px;
-            transition: opacity 0.2s;
+            font-weight: bold; font-size: 0.9rem; cursor: pointer; z-index: 20; border-radius: 6px;
         }
-        .blindfold-mask:hover { background: #cbd5e1; }
 
-        /* --- PRINT STYLES (HIDDEN ON SCREEN) --- */
+        /* --- TRACKER --- */
+        .tracker-card {
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px; margin-bottom: 16px;
+            background: rgba(255,255,255,0.03);
+        }
+        .day-btn {
+            padding: 8px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; 
+            border: 1px solid transparent; transition: all 0.2s; text-align: center;
+        }
+        .progress-bar { height: 6px; border-radius: 3px; background: rgba(0,0,0,0.2); overflow: hidden; margin-top: 4px; }
+        .progress-fill { height: 100%; transition: width 0.3s ease; }
+
+        /* --- PRINT STYLES (PRO GRID LAYOUT) --- */
         #print-view { display: none; }
         
         @media print {
-            @page { margin: 10mm; size: A4; }
-            body { background: white !important; -webkit-print-color-adjust: exact; overflow: visible; height: auto; }
+            @page { margin: 12mm; size: A4; }
+            body { background: white !important; -webkit-print-color-adjust: exact; height: auto; overflow: visible; }
             #app { display: none !important; } 
             #print-view { display: block !important; width: 100%; }
+            
+            .print-pair { 
+                display: block; 
+                page-break-after: always; /* Force new page per move pair */
+                page-break-inside: avoid;
+                margin-bottom: 30px; 
+                border-bottom: 1px solid #eee; 
+                padding-bottom: 30px; 
+            }
+            
+            /* Grid: Board Left (Fixed) | Text Right (Flexible) */
+            .print-layout {
+                display: flex;
+                gap: 25px;
+                align-items: flex-start;
+            }
+            
+            .print-board-col {
+                width: 220px;
+                flex-shrink: 0;
+            }
+            .print-board-img {
+                width: 220px;
+                height: 220px;
+                border: 2px solid #333;
+            }
+            .print-board-img table { width: 100%; height: 100%; border-collapse: collapse; }
+            .print-board-img td { width: 12.5%; height: 12.5%; padding: 0; }
+            .print-board-img img { width: 100%; display: block; }
+            
+            .print-text-col {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
 
-            .print-pair { page-break-after: always; page-break-inside: avoid; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
-            .print-header { display: flex; gap: 30px; margin-bottom: 20px; align-items: flex-start; }
-            .print-board { width: 200px; height: 200px; border: 2px solid #000; flex-shrink: 0; }
-            .print-board table { width: 100%; height: 100%; border-collapse: collapse; }
-            .print-board td { width: 12.5%; height: 12.5%; padding: 0; }
-            .print-board img { width: 100%; display: block; }
-            .white-cell { background: #f0d9b5 !important; }
-            .black-cell { background: #b58863 !important; }
+            .print-block {
+                margin-bottom: 15px;
+            }
             
-            .print-content { flex: 1; }
-            .print-label { font-size: 10px; font-weight: bold; text-transform: uppercase; color: #666; display: block; margin-bottom: 4px; }
-            .print-text { font-family: "Merriweather", serif; font-size: 12pt; line-height: 1.5; color: #000; margin-bottom: 5px; }
-            .print-meta { font-size: 9px; color: #888; font-family: monospace; }
+            .print-label { 
+                font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+                color: #666; margin-bottom: 6px; display: block; border-bottom: 1px solid #eee; padding-bottom: 2px;
+            }
             
-            .print-answer-block { margin-top: 15px; padding-left: 20px; border-left: 4px solid #ddd; }
-            .print-footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; font-size: 8pt; color: #aaa; border-top: 1px solid #eee; padding-top: 5px; }
+            .print-content { 
+                font-family: "Merriweather", serif; font-size: 12pt; line-height: 1.6; color: #111; 
+                white-space: pre-wrap; 
+            }
+            
+            .print-meta {
+                margin-top: 4px; font-size: 9px; font-family: monospace; color: #888;
+            }
+
+            .print-footer { 
+                position: fixed; bottom: 0; width: 100%; text-align: center; 
+                font-size: 8pt; color: #aaa; border-top: 1px solid #eee; padding-top: 5px; 
+            }
         }
     </style>
 </head>
@@ -77,233 +123,214 @@
 
     <div id="app">
 
-        <!-- ================= SIDEBAR (CONTROLS) ================= -->
-        <div class="flex flex-col w-80 shrink-0 shadow-2xl p-5 z-20"
+        <!-- ================= SIDEBAR ================= -->
+        <div class="flex flex-col w-80 shrink-0 shadow-2xl z-20 overflow-y-auto"
              :style="{ backgroundColor: colors.sidebarBg, color: colors.sidebarText }">
             
             <!-- Logo -->
-            <div class="flex items-center gap-3 mb-6">
+            <div class="p-5 pb-0 flex items-center gap-3">
                 <i class="fa-solid fa-chess-knight text-2xl" :style="{ color: colors.accent }"></i>
                 <div>
                     <h1 class="font-bold text-lg leading-tight">Strategy Pro</h1>
-                    <p class="text-xs opacity-60">Interview Trainer</p>
+                    <p class="text-xs opacity-60">German Interview Prep</p>
                 </div>
             </div>
 
-            <!-- Board Area -->
-            <div class="p-2 rounded mb-6" :style="{ backgroundColor: 'rgba(255,255,255,0.1)' }">
-                <div id="myBoard" class="rounded overflow-hidden border border-white/20"></div>
-                <div class="flex justify-between mt-2 text-xs font-bold uppercase">
-                    <span :style="{ color: colors.accent }">Question (White)</span>
-                    <span class="opacity-50">Answer (Black)</span>
+            <!-- Tabs -->
+            <div class="flex mt-6 mx-5 border-b" :style="{ borderColor: 'rgba(255,255,255,0.1)' }">
+                <div class="tab-btn flex-1 text-center" :class="{ active: currentTab === 'strategy' }" @click="currentTab = 'strategy'">
+                    <i class="fa-solid fa-chess-board mr-2"></i>Strategy
+                </div>
+                <div class="tab-btn flex-1 text-center" :class="{ active: currentTab === 'tracker' }" @click="currentTab = 'tracker'">
+                    <i class="fa-solid fa-list-check mr-2"></i>Tracker
                 </div>
             </div>
 
-            <!-- Playback Controls -->
-            <div class="space-y-3 mb-6">
-                <button @click="toggleAutoPlay" class="w-full py-2 rounded font-medium transition flex items-center justify-center gap-2"
-                        :style="isPlaying ? { backgroundColor: '#ef4444', color: 'white' } : { backgroundColor: colors.accent, color: 'white' }">
-                    <i :class="isPlaying ? 'fa-solid fa-stop' : 'fa-solid fa-play'"></i>
-                    {{ isPlaying ? 'Stop Auto' : 'Auto Replay' }}
-                </button>
+            <!-- STRATEGY CONTROLS -->
+            <div v-if="currentTab === 'strategy'" class="p-5 flex-1 flex flex-col gap-4">
+                <div class="p-2 rounded" :style="{ backgroundColor: 'rgba(255,255,255,0.1)' }">
+                    <div id="myBoard" class="rounded overflow-hidden border border-white/20"></div>
+                </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <!-- Unified Reset -->
-                    <button @click="resetGame" class="py-2 rounded font-medium border transition flex items-center justify-center"
-                            :style="{ borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'transparent', color: colors.sidebarText }">
-                        <i class="fa-solid fa-power-off mr-2"></i> Reset All
-                    </button>
-                    <button @click="flipBoard" class="py-2 rounded font-medium border transition flex items-center justify-center"
-                            :style="{ borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'transparent', color: colors.sidebarText }">
-                        Flip
-                    </button>
+                    <button @click="resetGame" class="py-2 rounded font-medium border text-xs flex items-center justify-center transition hover:text-red-400" :style="{ borderColor: 'rgba(255,255,255,0.2)' }"><i class="fa-solid fa-power-off mr-2"></i> Reset</button>
+                    <button @click="flipBoard" class="py-2 rounded font-medium border text-xs transition" :style="{ borderColor: 'rgba(255,255,255,0.2)' }">Flip Board</button>
                 </div>
-            </div>
-
-            <!-- Settings (Bottom) -->
-            <div class="mt-auto pt-4 border-t space-y-4" :style="{ borderColor: 'rgba(255,255,255,0.1)' }">
+                <button @click="toggleAutoPlay" class="w-full py-2 rounded font-medium transition text-xs flex items-center justify-center gap-2" :style="isPlaying ? { backgroundColor: '#ef4444', color: 'white' } : { backgroundColor: colors.accent, color: 'white' }">
+                    <i :class="isPlaying ? 'fa-solid fa-stop' : 'fa-solid fa-play'"></i> {{ isPlaying ? 'Stop Replay' : 'Auto Replay' }}
+                </button>
                 
-                <!-- Theme Selector -->
-                <div>
-                    <label class="text-xs font-bold uppercase opacity-50 block mb-1">Theme</label>
-                    <select v-model="selectedTheme" class="w-full p-2 rounded border focus:outline-none"
-                            :style="{ backgroundColor: 'rgba(0,0,0,0.2)', borderColor: 'rgba(255,255,255,0.1)', color: colors.sidebarText }">
-                        <option value="light">☀️ Light Mode</option>
-                        <option value="dark">🌙 Dark Mode</option>
-                        <option value="sepia">📜 Sepia Focus</option>
-                        <option value="forest">🌲 Forest Calm</option>
+                <!-- SAVED SESSIONS LIBRARY (Restored) -->
+                <div class="border-t pt-4" :style="{ borderColor: 'rgba(255,255,255,0.1)' }">
+                    <label class="text-xs font-bold uppercase opacity-50 block mb-2">Saved Sessions</label>
+                    <div class="flex gap-2 mb-2">
+                        <input v-model="newSessionName" placeholder="Name..." class="flex-1 p-1 rounded text-xs bg-black/20 border border-white/10 outline-none text-white">
+                        <button @click="saveToLibrary" class="px-2 rounded bg-white/10 text-xs hover:bg-white/20"><i class="fa-solid fa-save"></i></button>
+                    </div>
+                    <div class="max-h-32 overflow-y-auto space-y-1">
+                        <div v-for="(sess, name) in sessionLibrary" :key="name" 
+                             class="flex justify-between items-center p-2 rounded hover:bg-white/5 text-xs group cursor-pointer"
+                             @click="loadFromLibrary(name)">
+                            <span class="truncate">{{ name }}</span>
+                            <i @click.stop="deleteFromLibrary(name)" class="fa-solid fa-trash text-red-400 opacity-0 group-hover:opacity-100"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div class="border-t pt-4 mt-auto space-y-3" :style="{ borderColor: 'rgba(255,255,255,0.1)' }">
+                    <select v-model="selectedTheme" class="w-full p-2 rounded border focus:outline-none text-xs" :style="{ backgroundColor: 'rgba(0,0,0,0.2)', borderColor: 'rgba(255,255,255,0.1)', color: colors.sidebarText }">
+                        <option value="light">☀️ Light Theme</option>
+                        <option value="dark">🌙 Dark Theme</option>
+                        <option value="sepia">📜 Sepia Theme</option>
+                        <option value="forest">🌲 Forest Theme</option>
                     </select>
-                </div>
-
-                <!-- Blindfold Toggle -->
-                <div class="flex items-center justify-between">
-                    <span class="text-sm">Blindfold Mode</span>
-                    <button @click="isBlindfold = !isBlindfold" class="text-xl transition"
-                            :style="{ color: isBlindfold ? colors.accent : 'rgba(255,255,255,0.3)' }">
-                        <i :class="isBlindfold ? 'fa-solid fa-toggle-on' : 'fa-solid fa-toggle-off'"></i>
+                    
+                    <button @click="isBlindfold = !isBlindfold" class="w-full flex justify-between items-center text-xs p-2 rounded hover:bg-white/5">
+                        <span>Blindfold Mode</span>
+                        <i :class="isBlindfold ? 'fa-solid fa-toggle-on text-green-400' : 'fa-solid fa-toggle-off opacity-50'" class="text-lg"></i>
                     </button>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="saveToFile" class="py-1 rounded text-xs border" :style="{ borderColor: 'rgba(255,255,255,0.2)' }">Download JSON</button>
+                        <button @click="triggerLoad" class="py-1 rounded text-xs border" :style="{ borderColor: 'rgba(255,255,255,0.2)' }">Upload JSON</button>
+                        <input type="file" id="fileInput" class="hidden" accept=".json" @change="loadFromFile">
+                    </div>
+                    <button @click="exportPdf" class="w-full py-2 rounded font-medium text-xs bg-white/10 hover:bg-white/20">Print PDF</button>
                 </div>
+            </div>
 
-                <!-- File Operations -->
-                <div class="grid grid-cols-2 gap-2">
-                    <button @click="saveToFile" class="py-1 px-2 rounded text-xs border" :style="{ borderColor: 'rgba(255,255,255,0.2)' }"><i class="fa-solid fa-download"></i> Save</button>
-                    <button @click="triggerLoad" class="py-1 px-2 rounded text-xs border" :style="{ borderColor: 'rgba(255,255,255,0.2)' }"><i class="fa-solid fa-upload"></i> Load</button>
-                    <input type="file" id="fileInput" class="hidden" accept=".json" @change="loadFromFile">
+            <!-- TRACKER CONTROLS -->
+            <div v-if="currentTab === 'tracker'" class="p-5 flex-1 overflow-y-auto">
+                <div class="mb-4">
+                    <h2 class="text-xs font-bold uppercase opacity-50 mb-2">Select Day</h2>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button v-for="d in 7" :key="d" @click="activeDay = d" class="day-btn"
+                                :style="activeDay === d ? { backgroundColor: colors.accent, color: 'white' } : { backgroundColor: 'rgba(255,255,255,0.1)' }">
+                            Tag {{ d }}
+                        </button>
+                    </div>
                 </div>
-
-                <button @click="exportPdf" class="w-full py-2 rounded font-medium text-sm"
-                        :style="{ backgroundColor: 'rgba(255,255,255,0.1)', color: colors.sidebarText }">
-                    <i class="fa-solid fa-print mr-2"></i> Print PDF
-                </button>
+                <div class="p-4 rounded text-center" :style="{ backgroundColor: 'rgba(255,255,255,0.05)' }">
+                    <div class="text-xs opacity-60 mb-1">Focus Today</div>
+                    <div class="font-bold text-sm" :style="{ color: colors.accent }">{{ getDayFocus(activeDay) }}</div>
+                </div>
             </div>
         </div>
 
-        <!-- ================= MAIN EDITOR ================= -->
+        <!-- ================= MAIN CONTENT ================= -->
         <div class="flex-1 flex flex-col overflow-hidden" :style="{ backgroundColor: colors.bgMain }">
             
-            <!-- Scrollable Content -->
-            <div class="flex-1 overflow-y-auto p-8" id="scrollContainer">
+            <!-- STRATEGY VIEW -->
+            <div v-if="currentTab === 'strategy'" class="flex-1 overflow-y-auto p-8" id="scrollContainer">
                 <div class="max-w-3xl mx-auto pb-20">
-                    
-                    <!-- Empty State -->
                     <div v-if="moves.length === 0" class="text-center py-20 opacity-30" :style="{ color: colors.textMain }">
                         <i class="fa-solid fa-chess-board text-6xl mb-4"></i>
-                        <h2 class="text-2xl font-bold">Ready to Practice?</h2>
-                        <p>Make a move on the board to begin.</p>
+                        <h2 class="text-2xl font-bold">Start Your Match</h2>
                     </div>
 
-                    <!-- Move List -->
-                    <div v-for="(move, index) in moves" :key="move.id" 
-                         class="flex gap-4 mb-6 group"
-                         @click="jumpToMove(index)">
-                        
-                        <!-- 1. Marker -->
+                    <div v-for="(move, index) in moves" :key="move.id" class="flex gap-4 mb-6 group" @click="jumpToMove(index)">
                         <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 border-2 z-10"
-                             :style="{ 
-                                backgroundColor: colors.bgCard, 
-                                borderColor: currentMoveIndex === index ? colors.accent : colors.borderColor,
-                                color: currentMoveIndex === index ? colors.accent : colors.textMuted
-                             }">
+                             :style="{ backgroundColor: colors.bgCard, borderColor: currentMoveIndex === index ? colors.accent : colors.borderColor, color: currentMoveIndex === index ? colors.accent : colors.textMuted }">
                             {{ getMoveNumber(index) }}
                         </div>
-
-                        <!-- 2. Content Card -->
-                        <div class="flex-1 rounded-lg border overflow-hidden shadow-sm relative"
-                             :style="{ backgroundColor: colors.bgCard, borderColor: colors.borderColor }">
-                            
-                            <!-- Header -->
-                            <div class="px-4 py-2 border-b flex justify-between items-center"
-                                 :style="{ borderColor: colors.borderColor, backgroundColor: 'rgba(0,0,0,0.03)' }">
-                                <span class="text-xs font-bold uppercase" 
-                                      :style="{ color: move.color === 'w' ? colors.accent : '#10b981' }">
-                                    {{ move.color === 'w' ? 'Interviewer' : 'Candidate' }}
-                                </span>
-                                <span class="font-mono text-xl opacity-50" :style="{ color: colors.textMain }">{{ move.san }}</span>
+                        <div class="flex-1 rounded-lg border overflow-hidden shadow-sm" :style="{ backgroundColor: colors.bgCard, borderColor: colors.borderColor }">
+                            <div class="px-4 py-2 border-b flex justify-between items-center" :style="{ borderColor: colors.borderColor, backgroundColor: 'rgba(0,0,0,0.03)' }">
+                                <span class="text-xs font-bold uppercase" :style="{ color: move.color === 'w' ? colors.accent : '#10b981' }">{{ move.color === 'w' ? 'Interviewer' : 'Candidate' }}</span>
+                                <span class="font-mono text-xs opacity-50" :style="{ color: colors.textMain }">{{ move.san }}</span>
                             </div>
-
-                            <!-- Editor Body -->
                             <div class="relative">
-                                
-                                <!-- BLINDFOLD MASK -->
-                                <div v-if="isBlindfold && move.color === 'b' && !move.revealed" 
-                                     class="blindfold-mask"
-                                     @click.stop="revealMove(index)">
-                                     <span>🙈 Hidden Answer (Click to Reveal)</span>
-                                </div>
-
-                                <!-- Toolbar -->
-                                <div class="px-3 py-1 border-b flex gap-2" 
-                                     :style="{ borderColor: colors.borderColor, backgroundColor: 'rgba(0,0,0,0.02)' }">
-                                    <div class="w-3 h-3 rounded-full bg-black cursor-pointer border border-gray-300" @click.stop="applyColor('black')"></div>
-                                    <div class="w-3 h-3 rounded-full bg-red-600 cursor-pointer border border-gray-300" @click.stop="applyColor('#dc2626')"></div>
-                                    <div class="w-3 h-3 rounded-full bg-blue-600 cursor-pointer border border-gray-300" @click.stop="applyColor('#2563eb')"></div>
-                                    <div class="w-3 h-3 rounded-full bg-green-600 cursor-pointer border border-gray-300" @click.stop="applyColor('#16a34a')"></div>
-                                </div>
-
-                                <!-- Text Area -->
-                                <div contenteditable="true" 
-                                     class="w-full min-h-[80px] p-4 outline-none text-base leading-relaxed"
-                                     :style="{ color: colors.textMain }"
-                                     placeholder="Type notes here..."
-                                     @input="updateComment($event, index)"
-                                     @click.stop
-                                     v-html="move.comment">
-                                </div>
+                                <div v-if="isBlindfold && move.color === 'b' && !move.revealed" class="blindfold-mask" @click.stop="revealMove(index)"><span>🙈 Hidden (Click to Reveal)</span></div>
+                                <textarea v-model="move.comment" class="w-full min-h-[100px] p-4 outline-none text-base leading-relaxed bg-transparent resize-y" :style="{ color: colors.textMain }" placeholder="Type your notes here..." @click.stop></textarea>
                             </div>
-
-                            <!-- Footer (Timers & Audio) -->
-                            <div class="px-4 py-2 border-t flex items-center gap-4" 
-                                 :style="{ borderColor: colors.borderColor, backgroundColor: 'rgba(0,0,0,0.02)' }">
-                                
-                                <!-- Thinking Timer -->
+                            <div class="px-4 py-2 border-t flex items-center gap-4 flex-wrap" :style="{ borderColor: colors.borderColor, backgroundColor: 'rgba(0,0,0,0.02)' }">
                                 <div class="flex items-center gap-2 text-xs font-mono" :style="{ color: colors.textMuted }">
-                                    <i class="fa-solid fa-brain"></i>
-                                    <input type="text" class="bg-transparent border-none text-center w-10 focus:outline-none" 
-                                           :value="formatTime(move.timing.thinkingSeconds)" 
-                                           :style="{ color: 'inherit' }"
-                                           @change="updateTime($event, index, 'thinking')">
-                                    <button @click.stop="toggleTimer(index, 'thinking')">
-                                        <i :class="move.timing.activeTimer === 'thinking' ? 'fa-solid fa-pause text-blue-500' : 'fa-solid fa-play opacity-50'"></i>
-                                    </button>
+                                    <i class="fa-solid fa-brain"></i> <input type="text" class="bg-transparent border-none text-center w-10 focus:outline-none" :value="formatTime(move.timing.thinkingSeconds)" @change="updateTime($event, index, 'thinking')">
+                                    <button @click.stop="toggleTimer(index, 'thinking')"><i :class="move.timing.activeTimer === 'thinking' ? 'fa-solid fa-pause text-blue-500' : 'fa-solid fa-play opacity-50'"></i></button>
                                 </div>
-
                                 <div class="w-px h-3 bg-gray-300"></div>
-
-                                <!-- Speaking Timer -->
                                 <div class="flex items-center gap-2 text-xs font-mono" :style="{ color: colors.textMuted }">
-                                    <i class="fa-solid fa-comment"></i>
-                                    <input type="text" class="bg-transparent border-none text-center w-10 focus:outline-none" 
-                                           :value="formatTime(move.timing.speakingSeconds)" 
-                                           :style="{ color: 'inherit' }"
-                                           @change="updateTime($event, index, 'speaking')">
-                                    <button @click.stop="toggleTimer(index, 'speaking')">
-                                        <i :class="move.timing.activeTimer === 'speaking' ? 'fa-solid fa-pause text-green-500' : 'fa-solid fa-play opacity-50'"></i>
-                                    </button>
+                                    <i class="fa-solid fa-comment"></i> <input type="text" class="bg-transparent border-none text-center w-10 focus:outline-none" :value="formatTime(move.timing.speakingSeconds)" @change="updateTime($event, index, 'speaking')">
+                                    <button @click.stop="toggleTimer(index, 'speaking')"><i :class="move.timing.activeTimer === 'speaking' ? 'fa-solid fa-pause text-green-500' : 'fa-solid fa-play opacity-50'"></i></button>
                                 </div>
-
-                                <!-- AUDIO CONTROLS (NEW) -->
                                 <div class="ml-auto flex items-center gap-2">
-                                    
-                                    <!-- Recording State -->
-                                    <button v-if="move.isRecording" @click.stop="stopRecording(index)" class="text-red-500 animate-pulse font-bold text-xs flex items-center gap-1">
-                                        <i class="fa-solid fa-stop-circle text-sm"></i> STOP
-                                    </button>
-
-                                    <!-- Playback State -->
-                                    <div v-else-if="move.audioData" class="flex items-center gap-2 bg-black/5 px-2 py-1 rounded-full border border-black/10">
-                                        <button @click.stop="playAudio(index)" class="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center gap-1">
-                                            <i class="fa-solid fa-play"></i> PLAY
-                                        </button>
-                                        <button @click.stop="deleteAudio(index)" class="text-red-400 hover:text-red-600 text-[10px] ml-1">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                    </div>
-
-                                    <!-- Idle State -->
-                                    <button v-else @click.stop="startRecording(index)" class="opacity-30 hover:opacity-100 hover:text-red-500 transition"
-                                            :style="{ color: colors.textMuted }">
-                                        <i class="fa-solid fa-microphone"></i>
-                                    </button>
+                                    <button v-if="!move.audioData && !move.isRecording" @click.stop="startRecording(index)" class="opacity-40 hover:opacity-100 hover:text-red-500 transition" :style="{ color: colors.textMuted }"><i class="fa-solid fa-microphone"></i></button>
+                                    <button v-if="move.isRecording" @click.stop="stopRecording(index)" class="text-red-500 animate-pulse font-bold text-xs flex items-center gap-1"><i class="fa-solid fa-stop-circle"></i> STOP</button>
+                                    <div v-if="move.audioData" class="flex items-center gap-2"><audio :src="move.audioData" controls class="h-6 w-48"></audio><button @click.stop="deleteAudio(index)" class="text-red-400 hover:text-red-600 ml-1"><i class="fa-solid fa-trash"></i></button></div>
                                 </div>
-
                             </div>
-
                         </div>
                     </div>
-
                 </div>
             </div>
 
-            <!-- Sticky Footer (Credits) -->
-            <div class="p-3 text-center text-xs border-t shrink-0 z-10"
-                 :style="{ backgroundColor: colors.bgMain, borderColor: colors.borderColor, color: colors.textMuted }">
-                Web Developer: Abdel-Rahman.Gamal | 01001395058
+            <!-- TRACKER VIEW -->
+            <div v-if="currentTab === 'tracker'" class="flex-1 overflow-y-auto p-8">
+                <div class="max-w-4xl mx-auto">
+                    <div class="flex justify-between items-center mb-6">
+                        <h1 class="text-2xl font-bold" :style="{ color: colors.textMain }">Plan: <span :style="{ color: colors.accent }">Tag {{ activeDay }}</span></h1>
+                        <button @click="resetDayProgress" class="text-xs text-red-400 hover:underline">Reset Day {{ activeDay }}</button>
+                    </div>
+
+                    <!-- 1. DEUTSCH HÖREN -->
+                    <div class="tracker-card" :style="{ backgroundColor: colors.bgCard, borderColor: colors.borderColor }">
+                        <h3 class="font-bold text-sm uppercase mb-4 border-b pb-2 flex items-center gap-2" :style="{ color: colors.textMuted, borderColor: colors.borderColor }">
+                            <i class="fa-solid fa-headphones"></i> Deutsch Hören
+                        </h3>
+                        <div v-for="(task, idx) in dailyTasks.listening" :key="'L'+idx" class="mb-4">
+                            <div class="flex justify-between text-sm font-medium mb-1" :style="{ color: colors.textMain }">
+                                <span>{{ task.label }}</span>
+                                <span class="opacity-60 font-mono">{{ task.current }} / {{ task.target }} Min</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-fill" :style="{ width: Math.min(100, (task.current/task.target)*100) + '%', backgroundColor: colors.accent }"></div></div>
+                            <div class="flex gap-2 mt-2">
+                                <button @click="adjustProgress('listening', idx, 10)" class="px-3 py-1 rounded text-xs border" :style="{ borderColor: colors.borderColor, color: colors.textMain }">+ 10 Min</button>
+                                <button @click="adjustProgress('listening', idx, -10)" class="px-2 py-1 rounded text-xs border opacity-50" :style="{ borderColor: colors.borderColor, color: colors.textMain }">-</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. ANTWORTEN ÜBEN -->
+                    <div class="tracker-card" :style="{ backgroundColor: colors.bgCard, borderColor: colors.borderColor }">
+                        <h3 class="font-bold text-sm uppercase mb-4 border-b pb-2 flex items-center gap-2" :style="{ color: colors.textMuted, borderColor: colors.borderColor }">
+                            <i class="fa-solid fa-bullhorn"></i> Antworten Üben
+                        </h3>
+                        <p class="text-xs mb-4" :style="{ color: colors.textMain }">Target: <strong :style="{ color: colors.accent }">{{ getDailySpeakingTarget(activeDay) }}</strong></p>
+                        <div v-if="candidateMoves.length > 0">
+                            <div v-for="m in candidateMoves" :key="m.id" class="mb-3 pb-3 border-b border-dashed last:border-0" :style="{ borderColor: colors.borderColor }">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium truncate w-2/3" :style="{ color: colors.textMain }">{{ m.san }}: {{ m.comment.substring(0, 30) || '(No text)' }}...</span>
+                                    <span class="text-xs font-mono font-bold" :style="{ color: colors.accent }">{{ getMoveRep(m.id) }} / {{ getRepTarget(activeDay) }}</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="addMoveRep(m.id)" class="flex-1 py-1 rounded bg-green-500/10 text-green-600 text-xs font-bold border border-green-500/20 hover:bg-green-500/20">+ 1 Repetition</button>
+                                    <button @click="resetMoveRep(m.id)" class="px-2 text-xs opacity-30 hover:opacity-100 hover:text-red-500"><i class="fa-solid fa-rotate-left"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="text-center py-4 text-xs opacity-50" :style="{ color: colors.textMain }">No answers on board. Add moves in Strategy tab.</div>
+                    </div>
+
+                    <!-- 3. STIMME & VERHALTEN -->
+                    <div class="tracker-card" :style="{ backgroundColor: colors.bgCard, borderColor: colors.borderColor }">
+                        <h3 class="font-bold text-sm uppercase mb-4 border-b pb-2 flex items-center gap-2" :style="{ color: colors.textMuted, borderColor: colors.borderColor }">
+                            <i class="fa-solid fa-user-tie"></i> Stimme & Verhalten
+                        </h3>
+                        <div v-for="(task, idx) in dailyTasks.behavior" :key="'B'+idx" class="flex items-center gap-3 mb-3 p-2 rounded" :style="{ backgroundColor: task.done ? 'rgba(16, 185, 129, 0.1)' : 'transparent' }">
+                            <input type="checkbox" v-model="task.done" @change="saveTracker" class="w-4 h-4 cursor-pointer">
+                            <div class="flex-1">
+                                <div class="text-sm font-medium" :style="{ color: task.done ? '#10b981' : colors.textMain, textDecoration: task.done ? 'line-through' : 'none' }">{{ task.label }}</div>
+                                <div class="text-xs opacity-60" :style="{ color: colors.textMuted }">{{ task.desc }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            <div class="p-3 text-center text-xs border-t shrink-0 z-10" :style="{ backgroundColor: colors.bgMain, borderColor: colors.borderColor, color: colors.textMuted }">Web Developer: Abdel-Rahman.Gamal | 01001395058</div>
         </div>
-
     </div>
 
-    <!-- PRINT CONTAINER -->
+    <!-- PRINT VIEW -->
     <div id="print-view"></div>
 
     <script>
@@ -318,22 +345,98 @@
 
         createApp({
             setup() {
+                const currentTab = ref('strategy');
                 const moves = ref([]);
                 const currentMoveIndex = ref(-1);
                 const turn = ref('w');
                 const isPlaying = ref(false);
                 const isBlindfold = ref(false);
                 const selectedTheme = ref('light');
+                const colors = computed(() => THEME_PALETTES[selectedTheme.value]);
                 
                 const game = new Chess();
                 let board = null;
                 let timerInterval = null;
                 let autoPlayTimeout = null;
-                // Audio Recorder
                 let mediaRecorder = null;
 
-                const colors = computed(() => THEME_PALETTES[selectedTheme.value]);
+                // --- LIBRARY ---
+                const sessionLibrary = ref({});
+                const newSessionName = ref('');
 
+                // --- TRACKER LOGIC ---
+                const activeDay = ref(1);
+                const trackerData = ref({}); 
+
+                const getDayFocus = (d) => {
+                    if(d <= 2) return "Setup & Drill (5x Reps with Card)";
+                    if(d <= 4) return "Intensive (3x Reps No Card)";
+                    if(d <= 6) return "Mock & Polish (2x Reps No Card)";
+                    return "Interview Day (Warmup Only)";
+                };
+
+                const getRepTarget = (d) => {
+                    if(d <= 2) return 5;
+                    if(d <= 4) return 3;
+                    if(d <= 6) return 2;
+                    return 1;
+                };
+
+                const getDailySpeakingTarget = (d) => {
+                    if(d <= 2) return "5x Each Question (Reading Allowed)";
+                    if(d <= 4) return "3x Each Question (Memory)";
+                    if(d <= 6) return "2x Each Question + 1 Full Mock";
+                    return "Opening Lines Only";
+                };
+
+                const candidateMoves = computed(() => moves.value.filter(m => m.color === 'b'));
+
+                const getDailyTemplate = (d) => {
+                    return {
+                        listening: [
+                            { label: 'Morgens (Podcast/Radio)', target: 30, current: 0 },
+                            { label: 'Abends (Youtube/Netflix)', target: (d<=4 ? 60 : 30), current: 0 }
+                        ],
+                        behavior: [
+                            { label: 'Summen ("Mmmm")', desc: '2 Min', done: false },
+                            { label: 'Langsam sprechen', desc: '3 Min', done: false },
+                            { label: 'Schwierige Wörter', desc: '5 Min (10x jedes)', done: false },
+                            { label: 'Körpersprache', desc: '15 Min (Spiegel, Blickkontakt, Lächeln)', done: false }
+                        ],
+                        moveReps: {}
+                    };
+                };
+
+                const dailyTasks = computed(() => {
+                    const key = `day${activeDay.value}`;
+                    if(!trackerData.value[key]) trackerData.value[key] = getDailyTemplate(activeDay.value);
+                    return trackerData.value[key];
+                });
+
+                const adjustProgress = (cat, idx, val) => {
+                    const task = dailyTasks.value[cat][idx];
+                    task.current = Math.max(0, task.current + val);
+                    saveTracker();
+                };
+
+                const getMoveRep = (id) => dailyTasks.value.moveReps[id] || 0;
+                const addMoveRep = (id) => { if(!dailyTasks.value.moveReps[id]) dailyTasks.value.moveReps[id]=0; dailyTasks.value.moveReps[id]++; saveTracker(); };
+                const resetMoveRep = (id) => { dailyTasks.value.moveReps[id] = 0; saveTracker(); };
+                const resetDayProgress = () => { if(confirm("Reset?")) { trackerData.value[`day${activeDay.value}`] = getDailyTemplate(activeDay.value); saveTracker(); } };
+
+                // --- DATA CLEANING ---
+                function cleanLegacyContent(rawMoves) {
+                    return rawMoves.map(m => {
+                        if (m.comment && (m.comment.includes('<') || m.comment.includes('&'))) {
+                            const tmp = document.createElement("DIV");
+                            tmp.innerHTML = m.comment;
+                            m.comment = tmp.textContent || tmp.innerText || "";
+                        }
+                        return m;
+                    });
+                }
+
+                // --- LIFECYCLE ---
                 onMounted(() => {
                     initBoard();
                     loadFromStorage();
@@ -341,204 +444,123 @@
                     window.addEventListener('keydown', handleKey);
                 });
 
-                watch(moves, () => { localStorage.setItem('chessMoves', JSON.stringify(moves.value)); }, { deep: true });
-                watch(selectedTheme, (val) => { localStorage.setItem('chessTheme', val); });
+                watch(moves, () => localStorage.setItem('chessMoves', JSON.stringify(moves.value)), { deep: true });
+                watch(selectedTheme, (val) => localStorage.setItem('chessTheme', val));
+                watch(sessionLibrary, () => localStorage.setItem('chessLibrary', JSON.stringify(sessionLibrary.value)), {deep:true});
+                const saveTracker = () => localStorage.setItem('germanTracker', JSON.stringify(trackerData.value));
 
                 function loadFromStorage() {
-                    const savedMoves = localStorage.getItem('chessMoves');
-                    const savedTheme = localStorage.getItem('chessTheme');
-                    if (savedMoves) {
-                        moves.value = JSON.parse(savedMoves);
-                        if (moves.value.length > 0) {
-                            currentMoveIndex.value = moves.value.length - 1;
-                            setTimeout(() => jumpToMove(currentMoveIndex.value), 200);
-                        }
-                    }
-                    if (savedTheme && THEME_PALETTES[savedTheme]) selectedTheme.value = savedTheme;
+                    const th = localStorage.getItem('chessTheme'); if(th && THEME_PALETTES[th]) selectedTheme.value = th;
+                    const tr = localStorage.getItem('germanTracker'); if(tr) trackerData.value = JSON.parse(tr);
+                    const lib = localStorage.getItem('chessLibrary'); if(lib) sessionLibrary.value = JSON.parse(lib);
+                    const m = localStorage.getItem('chessMoves'); 
+                    if(m) { moves.value = cleanLegacyContent(JSON.parse(m)); if(moves.value.length>0) setTimeout(() => jumpToMove(moves.value.length - 1), 200); }
                 }
 
-                function initBoard() {
-                    board = Chessboard('myBoard', {
-                        draggable: true, position: 'start', onDragStart: onDragStart, onDrop: onDrop,
-                        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-                    });
+                // --- LIBRARY ---
+                function saveToLibrary() {
+                    if(!newSessionName.value) return alert("Enter name");
+                    // SAFE COPY: Remove audio data before saving to internal library
+                    const cleanMoves = JSON.parse(JSON.stringify(moves.value)).map(m => { m.audioData = null; return m; });
+                    sessionLibrary.value[newSessionName.value] = { moves: cleanMoves, date: new Date().toISOString() };
+                    newSessionName.value = '';
+                    alert("Saved (Audio excluded from library to save space)");
                 }
-
-                function onDragStart(source, piece) {
-                    if (isPlaying.value || game.game_over()) return false;
-                    if ((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) return false;
+                function loadFromLibrary(name) {
+                    if(!confirm("Load session? Unsaved moves lost.")) return;
+                    moves.value = sessionLibrary.value[name].moves;
+                    jumpToMove(moves.value.length-1);
                 }
+                function deleteFromLibrary(name) { if(confirm("Delete?")) delete sessionLibrary.value[name]; }
 
+                // --- CHESS ---
+                function initBoard() { board = Chessboard('myBoard', { draggable: true, position: 'start', onDragStart: onDragStart, onDrop: onDrop, pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' }); }
+                function onDragStart(source, piece) { if(isPlaying.value || game.game_over()) return false; if((game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1)) return false; }
                 function onDrop(source, target) {
                     const move = game.move({ from: source, to: target, promotion: 'q' });
                     if (move === null) return 'snapback';
                     if (currentMoveIndex.value < moves.value.length - 1) moves.value = moves.value.slice(0, currentMoveIndex.value + 1);
-
-                    moves.value.push({
-                        id: Date.now(), color: move.color, san: move.san, fen: game.fen(), comment: '', revealed: false,
-                        audioData: null, isRecording: false, // AUDIO FIELDS
-                        timing: { thinkingSeconds: 0, speakingSeconds: 0, activeTimer: null }
-                    });
-
-                    currentMoveIndex.value = moves.value.length - 1;
-                    turn.value = game.turn();
-                    scrollToBottom();
+                    moves.value.push({ id: Date.now(), color: move.color, san: move.san, fen: game.fen(), comment: '', revealed: false, audioData: null, isRecording: false, timing: { thinkingSeconds: 0, speakingSeconds: 0, activeTimer: null } });
+                    currentMoveIndex.value = moves.value.length - 1; turn.value = game.turn(); scrollToBottom();
                 }
-
                 function jumpToMove(index) {
-                    currentMoveIndex.value = index;
-                    const fen = index === -1 ? 'start' : moves.value[index].fen;
-                    board.position(fen);
-                    game.reset();
-                    if (index > -1) game.load(moves.value[index].fen);
-                    turn.value = game.turn();
+                    currentMoveIndex.value = index; const fen = index === -1 ? 'start' : moves.value[index].fen;
+                    board.position(fen); game.reset(); if(index > -1) game.load(moves.value[index].fen); turn.value = game.turn();
                     if(index > -1) nextTick(() => { const el = document.querySelectorAll('.group')[index]; if(el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
                 }
-
-                function resetGame() {
-                    if(!confirm("⚠️ RESET EVERYTHING?\nThis will clear the board, delete all moves, audio, and wipe saved data.")) return;
-                    game.reset(); board.start(); moves.value = []; currentMoveIndex.value = -1; turn.value = 'w'; stopAutoPlay();
-                    localStorage.removeItem('chessMoves');
-                }
-
+                function resetGame() { if(!confirm("⚠️ RESET?")) return; game.reset(); board.start(); moves.value = []; currentMoveIndex.value = -1; turn.value = 'w'; stopAutoPlay(); localStorage.removeItem('chessMoves'); }
                 function flipBoard() { board.flip(); }
-                function applyColor(color) { document.execCommand('foreColor', false, color); }
-                function updateComment(event, index) { moves.value[index].comment = event.target.innerHTML; }
-                function getMoveNumber(index) { return Math.floor(index / 2) + 1 + (index % 2 === 0 ? '.' : '...'); }
-                function scrollToBottom() { nextTick(() => document.getElementById('scrollContainer').scrollTop = 99999); }
                 function revealMove(index) { moves.value[index].revealed = true; }
+                function updateComment(e, i) { moves.value[i].comment = e.target.value; }
+                function getMoveNumber(i) { return Math.floor(i/2)+1 + (i%2===0?'.':'...'); }
+                function scrollToBottom() { nextTick(() => document.getElementById('scrollContainer').scrollTop = 99999); }
 
-                // --- TIMERS ---
-                function toggleTimer(index, type) {
-                    const move = moves.value[index];
-                    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                    if (move.timing.activeTimer === type) { move.timing.activeTimer = null; return; }
-                    moves.value.forEach(m => m.timing.activeTimer = null);
-                    move.timing.activeTimer = type;
-                    timerInterval = setInterval(() => { type === 'thinking' ? move.timing.thinkingSeconds++ : move.timing.speakingSeconds++; }, 1000);
-                }
-                function formatTime(s) { return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }
-                function updateTime(e, index, type) {
-                    const val = e.target.value; const parts = val.split(':'); let s = 0;
-                    if(parts.length === 2) s = parseInt(parts[0])*60 + parseInt(parts[1]); else s = parseInt(val) || 0;
-                    if(type === 'thinking') moves.value[index].timing.thinkingSeconds = s; else moves.value[index].timing.speakingSeconds = s;
-                }
-
-                // --- AUDIO RECORDER (BASE64) ---
+                // --- AUDIO & TIMERS ---
                 async function startRecording(index) {
-                    if (location.protocol === 'file:') { alert("⚠️ Audio blocked by browser.\nPlease run via localhost."); return; }
+                    if(location.protocol === 'file:') return alert("Use localhost for audio.");
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                         mediaRecorder = new MediaRecorder(stream);
                         const chunks = [];
                         mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                        mediaRecorder.onstop = () => {
-                            const blob = new Blob(chunks, { type: 'audio/webm' });
-                            const reader = new FileReader();
-                            reader.readAsDataURL(blob);
-                            reader.onloadend = () => {
-                                moves.value[index].audioData = reader.result;
-                                moves.value[index].isRecording = false;
-                            };
-                        };
-                        mediaRecorder.start();
-                        moves.value[index].isRecording = true;
-                    } catch (e) { alert("Mic access denied."); }
+                        mediaRecorder.onstop = () => { const blob = new Blob(chunks, { type: 'audio/webm' }); const reader = new FileReader(); reader.readAsDataURL(blob); reader.onloadend = () => { moves.value[index].audioData = reader.result; moves.value[index].isRecording = false; }; };
+                        mediaRecorder.start(); moves.value[index].isRecording = true;
+                    } catch(e) { alert("Mic Error"); }
                 }
-
-                function stopRecording(index) { if (mediaRecorder) mediaRecorder.stop(); }
-                function playAudio(index) { if (moves.value[index].audioData) new Audio(moves.value[index].audioData).play(); }
+                function stopRecording(index) { if(mediaRecorder) mediaRecorder.stop(); }
                 function deleteAudio(index) { if(confirm("Delete audio?")) moves.value[index].audioData = null; }
-
-                // --- AUTO PLAY ---
-                function toggleAutoPlay() { isPlaying.value ? stopAutoPlay() : startAutoPlay(); }
-                async function startAutoPlay() {
-                    if (moves.value.length === 0) return; isPlaying.value = true; jumpToMove(-1); await new Promise(r => setTimeout(r, 1000));
-                    for (let i = 0; i < moves.value.length; i++) {
-                        if (!isPlaying.value) break; jumpToMove(i);
-                        const move = moves.value[i];
-                        const waitTime = Math.max((move.timing.thinkingSeconds + move.timing.speakingSeconds) * 1000, 2000);
-                        await new Promise(r => { autoPlayTimeout = setTimeout(r, waitTime); });
-                    } isPlaying.value = false;
+                function toggleTimer(index, type) {
+                    const move = moves.value[index]; if(timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+                    if(move.timing.activeTimer === type) { move.timing.activeTimer = null; return; }
+                    moves.value.forEach(m => m.timing.activeTimer = null); move.timing.activeTimer = type;
+                    timerInterval = setInterval(() => { type === 'thinking' ? move.timing.thinkingSeconds++ : move.timing.speakingSeconds++; }, 1000);
                 }
-                function stopAutoPlay() { isPlaying.value = false; if(autoPlayTimeout) clearTimeout(autoPlayTimeout); }
+                function formatTime(s) { return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }
+                function updateTime(e, index, type) { const val = e.target.value; const parts = val.split(':'); let s = 0; if(parts.length===2) s = parseInt(parts[0])*60+parseInt(parts[1]); else s = parseInt(val)||0; if(type==='thinking') moves.value[index].timing.thinkingSeconds=s; else moves.value[index].timing.speakingSeconds=s; }
 
-                // --- FILE I/O ---
-                function saveToFile() {
-                    const data = { moves: moves.value, theme: selectedTheme.value };
-                    const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
-                    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'chess_interview.json'; a.click();
-                }
+                // --- FILES & PRINT ---
+                function saveToFile() { const blob = new Blob([JSON.stringify({ moves: moves.value, tracker: trackerData.value })], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'interview_prep.json'; a.click(); }
                 function triggerLoad() { document.getElementById('fileInput').click(); }
-                function loadFromFile(e) {
-                    const file = e.target.files[0]; if(!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {
-                        try { const data = JSON.parse(ev.target.result); if(data.moves) { moves.value = data.moves; if(data.theme) selectedTheme.value = data.theme; jumpToMove(moves.value.length - 1); } } catch(err) { alert("Invalid File"); }
-                    }; reader.readAsText(file);
+                function loadFromFile(e) { 
+                    const reader = new FileReader(); 
+                    reader.onload = ev => { try { const d = JSON.parse(ev.target.result); if(d.moves) { moves.value = cleanLegacyContent(d.moves); jumpToMove(moves.value.length-1); } if(d.tracker) trackerData.value = d.tracker; } catch(e){ alert("Invalid"); } }; 
+                    if(e.target.files[0]) reader.readAsText(e.target.files[0]);
                 }
-
-                // --- PRINT ENGINE ---
                 function exportPdf() {
-                    const container = document.getElementById('print-view');
+                    const el = document.getElementById('print-view');
                     const pairs = [];
                     for(let i=0; i<moves.value.length; i++) {
                         const m = moves.value[i];
                         if(m.color === 'w') pairs.push({ w: m, b: null });
-                        else if(pairs.length > 0) pairs[pairs.length-1].b = m;
-                        else pairs.push({ w: { fen: m.fen, san: '...', comment: 'Start', timing: {thinkingSeconds:0}}, b: m });
+                        else if(pairs.length) pairs[pairs.length-1].b = m;
+                        else pairs.push({ w: {fen: m.fen, san:'...', comment:'Start'}, b: m });
                     }
-
-                    let html = `<h1 style="text-align:center; font-family:sans-serif; margin-bottom:30px">Interview Strategy</h1>`;
+                    let h = `<h1 style="text-align:center;font-family:sans-serif;margin-bottom:30px">Interview Plan</h1>`;
                     pairs.forEach(p => {
-                        const boardHtml = generateStaticBoard(p.w.fen);
-                        const qText = p.w.comment || '<i>No question recorded.</i>';
-                        const aText = p.b ? (p.b.comment || '<i>No answer recorded.</i>') : '';
-                        html += `
-                        <div class="print-pair">
-                            <div class="print-header">
-                                <div class="print-board">${boardHtml}</div>
-                                <div class="print-content">
-                                    <span class="print-label">Interviewer (${p.w.san})</span>
-                                    <div class="print-text">${qText}</div>
-                                    <div class="print-meta">Think: ${formatTime(p.w.timing.thinkingSeconds)}</div>
-                                </div>
-                            </div>
-                            ${p.b ? `<div class="print-answer-block"><span class="print-label">My Answer (${p.b.san})</span><div class="print-text">${aText}</div><div class="print-meta">Speak: ${formatTime(p.b.timing.speakingSeconds)}</div></div>` : ''}
-                        </div>`;
+                        h += `<div class="print-pair"><div class="print-layout"><div class="print-board-col"><div class="print-board-img">${generateStaticBoard(p.w.fen)}</div></div><div class="print-text-col"><div class="print-block"><span class="print-label">Interviewer (${p.w.san})</span><div class="print-content">${p.w.comment||'No text'}</div><div class="print-meta">Think: ${formatTime(p.w.timing.thinkingSeconds)}</div></div>${p.b ? `<div class="print-block print-answer-block"><span class="print-label">Answer (${p.b.san})</span><div class="print-content">${p.b.comment||'No text'}</div><div class="print-meta">Speak: ${formatTime(p.b.timing.speakingSeconds)}</div></div>` : ''}</div></div></div>`;
                     });
-                    html += `<div class="print-footer">Web Developer : Abdel-Rahman.Gamal 01001395058</div>`;
-                    container.innerHTML = html;
-                    window.print();
+                    h += `<div class="print-footer">Developer: Abdel-Rahman.Gamal | 01001395058</div>`;
+                    el.innerHTML = h; window.print();
                 }
-
                 function generateStaticBoard(fen) {
-                    const tGame = new Chess(fen); const boardData = tGame.board();
-                    let h = '<table cellspacing="0" cellpadding="0">';
-                    for(let r=0; r<8; r++) { h += '<tr>'; for(let c=0; c<8; c++) {
-                        const isWhite = (r+c)%2 === 0; const bg = isWhite ? 'white-cell' : 'black-cell';
-                        const p = boardData[r][c];
-                        let img = ''; if(p) img = `<img src="https://chessboardjs.com/img/chesspieces/wikipedia/${p.color}${p.type.toUpperCase()}.png">`;
-                        h += `<td class="${bg}">${img}</td>`;
-                    } h += '</tr>'; } return h + '</table>';
+                    const b = new Chess(fen).board(); let html = '<table cellspacing="0" cellpadding="0">';
+                    for(let r=0; r<8; r++) { html += '<tr>'; for(let c=0; c<8; c++) { const bg = (r+c)%2===0 ? 'white-cell' : 'black-cell'; const p = b[r][c]; html += `<td class="${bg}">${p ? `<img src="https://chessboardjs.com/img/chesspieces/wikipedia/${p.color}${p.type.toUpperCase()}.png">` : ''}</td>`; } html += '</tr>'; } return html + '</table>';
                 }
 
-                function handleKey(e) {
-                    if(e.target.isContentEditable || e.target.tagName === 'INPUT') return;
-                    if(e.key === 'ArrowLeft') jumpToMove(currentMoveIndex.value > 0 ? currentMoveIndex.value - 1 : -1);
-                    if(e.key === 'ArrowRight' && currentMoveIndex.value < moves.value.length - 1) jumpToMove(currentMoveIndex.value + 1);
-                }
+                function toggleAutoPlay() { isPlaying.value ? stopAutoPlay() : startAutoPlay(); }
+                async function startAutoPlay() { isPlaying.value = true; jumpToMove(-1); await new Promise(r=>setTimeout(r,1000)); for(let i=0; i<moves.value.length; i++) { if(!isPlaying.value) break; jumpToMove(i); await new Promise(r=>autoPlayTimeout=setTimeout(r, 2000)); } isPlaying.value = false; }
+                function stopAutoPlay() { isPlaying.value = false; clearTimeout(autoPlayTimeout); }
+                function handleKey(e) { if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') { if(e.key === 'ArrowLeft') jumpToMove(Math.max(-1, currentMoveIndex.value-1)); if(e.key === 'ArrowRight') jumpToMove(Math.min(moves.value.length-1, currentMoveIndex.value+1)); } }
 
                 return {
-                    moves, turn, currentMoveIndex, isPlaying, isBlindfold, selectedTheme, colors,
-                    resetGame, flipBoard, exportPdf, jumpToMove, getMoveNumber,
-                    toggleTimer, formatTime, startRecording, stopRecording, playAudio, deleteAudio,
-                    toggleAutoPlay, applyColor, updateComment, updateTime, saveToFile, triggerLoad, loadFromFile, revealMove, handleAudio: ()=>{}
+                    moves, turn, currentMoveIndex, isPlaying, isBlindfold, selectedTheme, colors, currentTab,
+                    activeDay, getDayFocus, getRepTarget, getDailySpeakingTarget, dailyTasks, candidateMoves, sessionLibrary, newSessionName,
+                    resetGame, flipBoard, exportPdf, jumpToMove, getMoveNumber, toggleTimer, formatTime, startRecording, stopRecording, deleteAudio,
+                    toggleAutoPlay, updateComment, updateTime, saveToFile, triggerLoad, loadFromFile, revealMove, adjustTask: adjustProgress,
+                    saveTracker, addMoveRep, resetMoveRep, getMoveRep, resetDayProgress, saveToLibrary, loadFromLibrary, deleteFromLibrary
                 };
             }
         }).mount('#app');
     </script>
 </body>
 </html>
-
-
