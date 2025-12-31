@@ -449,6 +449,15 @@
                 watch(sessionLibrary, () => localStorage.setItem('chessLibrary', JSON.stringify(sessionLibrary.value)), {deep:true});
                 const saveTracker = () => localStorage.setItem('germanTracker', JSON.stringify(trackerData.value));
 
+                // FIX 2: Watch for blindfold mode changes to hide all questions
+                watch(isBlindfold, (newVal) => {
+                    if (newVal) { // when blindfold is turned on
+                        moves.value.forEach(m => {
+                            if (m.color === 'b') m.revealed = false;
+                        });
+                    }
+                });
+
                 function loadFromStorage() {
                     const th = localStorage.getItem('chessTheme'); if(th && THEME_PALETTES[th]) selectedTheme.value = th;
                     const tr = localStorage.getItem('germanTracker'); if(tr) trackerData.value = JSON.parse(tr);
@@ -548,7 +557,23 @@
                 }
 
                 function toggleAutoPlay() { isPlaying.value ? stopAutoPlay() : startAutoPlay(); }
-                async function startAutoPlay() { isPlaying.value = true; jumpToMove(-1); await new Promise(r=>setTimeout(r,1000)); for(let i=0; i<moves.value.length; i++) { if(!isPlaying.value) break; jumpToMove(i); await new Promise(r=>autoPlayTimeout=setTimeout(r, 2000)); } isPlaying.value = false; }
+                
+                // FIX 1: Auto-play uses individual card timing
+                async function startAutoPlay() { 
+                    isPlaying.value = true; 
+                    jumpToMove(-1); 
+                    await new Promise(r=>setTimeout(r,1000)); 
+                    for(let i=0; i<moves.value.length; i++) { 
+                        if(!isPlaying.value) break; 
+                        jumpToMove(i); 
+                        const move = moves.value[i];
+                        const delay = (move.timing.thinkingSeconds + move.timing.speakingSeconds) * 1000;
+                        // Minimum 500 ms so it's not too fast if times are zero
+                        await new Promise(r => autoPlayTimeout = setTimeout(r, Math.max(500, delay))); 
+                    } 
+                    isPlaying.value = false; 
+                }
+                
                 function stopAutoPlay() { isPlaying.value = false; clearTimeout(autoPlayTimeout); }
                 function handleKey(e) { if(e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') { if(e.key === 'ArrowLeft') jumpToMove(Math.max(-1, currentMoveIndex.value-1)); if(e.key === 'ArrowRight') jumpToMove(Math.min(moves.value.length-1, currentMoveIndex.value+1)); } }
 
