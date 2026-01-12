@@ -87,22 +87,41 @@
             </button>
         </header>
 
-        <!-- 2. RESIZABLE BOARD SECTION -->
-        <div class="relative shrink-0 bg-[#312e2b] border-b border-gray-700 shadow-xl z-20"
-             :style="{ height: boardHeight + 'px' }">
-            
-            <!-- Chess Board -->
-            <div class="w-full h-full flex flex-col items-center justify-center p-2">
-                <div id="myBoard" class="aspect-square" :style="{ height: (boardHeight - 20) + 'px' }"></div>
-            </div>
+<!-- 2. RESIZABLE BOARD SECTION -->
+<div class="relative shrink-0 bg-[#312e2b] border-b border-gray-700 shadow-xl z-20 transition-all duration-75 ease-linear"
+     :style="{ height: boardHeight + 'px' }">
+    
+    <!-- Toggle Button (Hide/Show) -->
+    <button @click="toggleBoard" class="absolute top-2 right-2 text-gray-500 hover:text-white z-30 p-2 bg-black/20 rounded-full">
+        <i class="fa-solid" :class="boardHeight < 40 ? 'fa-chevron-down' : 'fa-chevron-up'"></i>
+    </button>
 
-            <!-- Drag Handle -->
-            <div class="absolute bottom-0 left-0 right-0 h-4 drag-handle flex items-center justify-center border-t border-gray-600 shadow-md"
-                 @mousedown="startDrag" 
-                 @touchstart="startDrag">
-                <i class="fa-solid fa-grip-lines text-gray-400 text-xs"></i>
-            </div>
+    <!-- Chess Board Container -->
+    <!-- Logic: We force width = height to keep it square and fitting inside the resizable area -->
+    <div class="w-full h-full flex items-center justify-center overflow-hidden pb-5">
+        <div id="myBoard" 
+             v-show="boardHeight > 40"
+             :style="{ width: (Math.max(0, boardHeight - 30)) + 'px', height: (Math.max(0, boardHeight - 30)) + 'px' }"
+             class="shadow-2xl"></div>
+        
+        <!-- Hidden State Text -->
+        <div v-if="boardHeight <= 40" class="text-xs text-gray-500 font-bold uppercase tracking-widest">
+            Board Hidden
         </div>
+    </div>
+
+    <!-- Drag Handle -->
+    <div class="absolute bottom-0 left-0 right-0 h-6 drag-handle flex items-center justify-center border-t border-gray-600 bg-gray-800 hover:bg-gray-700 cursor-row-resize z-40 group"
+         @mousedown="startDrag" 
+         @touchstart="startDrag">
+        <!-- Visual Grip Dots -->
+        <div class="flex gap-1">
+            <div class="w-1 h-1 rounded-full bg-gray-500 group-hover:bg-gray-300"></div>
+            <div class="w-1 h-1 rounded-full bg-gray-500 group-hover:bg-gray-300"></div>
+            <div class="w-1 h-1 rounded-full bg-gray-500 group-hover:bg-gray-300"></div>
+        </div>
+    </div>
+</div>
 
         <!-- 3. MAIN SCROLL AREA -->
         <main class="flex-1 overflow-y-auto relative bg-[#262421] p-4 pb-32 space-y-6" id="scrollContainer">
@@ -500,3 +519,4 @@
     </script>
 </body>
 </html>
+
