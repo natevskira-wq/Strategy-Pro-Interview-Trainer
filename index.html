@@ -86,14 +86,11 @@
 
             <!-- Chess Board Container -->
             <div class="w-full h-full flex items-center justify-center overflow-hidden pb-6 pt-2">
-                
-                <!-- The Board (Only render if big enough) -->
                 <div id="myBoard" 
                      v-show="boardHeight > 50"
                      :style="{ width: (Math.max(0, boardHeight - 40)) + 'px', height: (Math.max(0, boardHeight - 40)) + 'px' }"
                      class="shadow-2xl"></div>
                 
-                <!-- Hidden State Text -->
                 <div v-if="boardHeight <= 50" class="text-xs text-gray-500 font-bold uppercase tracking-widest">
                     Board Collapsed
                 </div>
@@ -152,7 +149,7 @@
                 <!-- Card Body -->
                 <div class="p-4 relative min-h-[100px]">
                     
-                    <!-- BLINDFOLD OVERLAY (Only for Answers) -->
+                    <!-- BLINDFOLD OVERLAY -->
                     <div v-if="isBlindfold && card.type === 'a' && !card.revealed" 
                          class="absolute inset-0 z-10 bg-gray-900 flex flex-col items-center justify-center cursor-pointer"
                          @click="card.revealed = true">
@@ -177,12 +174,12 @@
                             
                             <!-- STT Toolbar -->
                             <div class="flex items-center gap-2">
-                                <button v-if="card.spokenText" @click="copySpokenToMain(index)" class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded uppercase font-bold" title="Promote to Answer">
+                                <!-- USE BUTTON (Copies STT to Main) -->
+                                <button v-if="card.spokenText" @click="copySpokenToMain(index)" class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded uppercase font-bold shadow-md transition-all active:scale-95" title="Promote to Answer">
                                     <i class="fa-solid fa-arrow-up mr-1"></i> Use
                                 </button>
-                                <button v-if="card.spokenText" @click="copyToClipboard(card.spokenText)" class="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded">
-                                    <i class="fa-regular fa-copy"></i>
-                                </button>
+                                
+                                <!-- MIC BUTTON -->
                                 <button @click="toggleSTT(index)" 
                                         class="w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg text-white"
                                         :class="card.isListening ? 'bg-red-600 record-pulse' : 'bg-gray-600 hover:bg-gray-500'">
@@ -191,7 +188,7 @@
                             </div>
                         </div>
                         
-                        <!-- Spoken Text Area -->
+                        <!-- Spoken Text Display -->
                         <div class="bg-black/30 rounded p-3 text-xs italic text-gray-300 min-h-[40px] whitespace-pre-wrap leading-relaxed border border-gray-700/50">
                             {{ card.spokenText || 'Voice notes will appear here...' }}
                         </div>
@@ -268,8 +265,6 @@
 
     <script>
         const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
-        
-        // Morphy's Opera Game
         const PGN_SEQUENCE = `1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#`;
 
         createApp({
@@ -315,12 +310,10 @@
 
                 function onDrag(e) {
                     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                    const headerOffset = 60; // Approximate header height
+                    const headerOffset = 60;
                     let newHeight = clientY - headerOffset;
-                    
                     if (newHeight < 0) newHeight = 0;
                     if (newHeight > 500) newHeight = 500;
-                    
                     boardHeight.value = newHeight;
                     if(board && newHeight > 50) board.resize();
                 }
@@ -330,8 +323,6 @@
                     window.removeEventListener('mouseup', stopDrag);
                     window.removeEventListener('touchmove', onDrag);
                     window.removeEventListener('touchend', stopDrag);
-                    
-                    // Snap to minimize if too small
                     if(boardHeight.value < 50) boardHeight.value = 30;
                     if(board && boardHeight.value > 50) board.resize();
                 }
@@ -351,13 +342,7 @@
                     game.load_pgn(PGN_SEQUENCE);
                     moveQueue = game.history({ verbose: true });
                     game.reset();
-                    
-                    board = Chessboard('myBoard', {
-                        position: 'start',
-                        draggable: false,
-                        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-                    });
-                    
+                    board = Chessboard('myBoard', { position: 'start', draggable: false, pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' });
                     window.addEventListener('resize', () => { if(board) board.resize(); });
                 }
 
@@ -367,9 +352,8 @@
                         if(boardHeight.value > 50) board.position(game.fen());
                         currentMoveIndex++;
                     }
-                    
                     turn.value = game.turn();
-                    const isWhite = (currentMoveIndex % 2 !== 0); // White moved if index is odd now
+                    const isWhite = (currentMoveIndex % 2 !== 0);
 
                     cards.value.push({
                         id: Date.now(),
@@ -400,7 +384,7 @@
                     if(confirm("Delete this strategic line?")) cards.value.splice(index, 1);
                 }
 
-                // --- 3. STT LOGIC ---
+                // --- 3. STT LOGIC (FIXED) ---
                 function initSTT() {
                     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -413,44 +397,41 @@
 
                 function toggleSTT(index) {
                     if (!recognition) return alert("Browser does not support Speech API");
-                    
                     const card = cards.value[index];
 
                     if (card.isListening) {
                         recognition.stop();
                         card.isListening = false;
                     } else {
-                        cards.value.forEach(c => c.isListening = false); // Stop others
+                        // Stop others
+                        cards.value.forEach(c => c.isListening = false);
+                        
                         card.isListening = true;
                         recognition.lang = selectedLang.value;
 
-                        // Memory Logic: Keep old text, add new
-                        let sessionPrefix = card.spokenText ? card.spokenText + ' ' : '';
-                        let currentSession = '';
+                        // STT GLITCH FIX:
+                        // 1. Snapshot existing text (Base)
+                        // 2. Only append current session transcript to Base
+                        // 3. Update Base on End/Restart
+                        let baseText = card.spokenText ? card.spokenText.trim() : '';
 
                         recognition.start();
 
                         recognition.onresult = (e) => {
-                            let interim = '';
-                            let finalChunk = '';
-
-                            for (let i = e.resultIndex; i < e.results.length; ++i) {
-                                if (e.results[i].isFinal) finalChunk += e.results[i][0].transcript;
-                                else interim += e.results[i][0].transcript;
+                            let currentSessionTranscript = '';
+                            for (let i = 0; i < e.results.length; ++i) {
+                                currentSessionTranscript += e.results[i][0].transcript;
                             }
-                            
-                            if(finalChunk) currentSession += finalChunk;
-                            
-                            // Display: Existing + Current Final + Interim
-                            card.spokenText = (sessionPrefix + currentSession + interim).trim();
+                            // Append space only if there was previous text
+                            const separator = baseText.length > 0 ? ' ' : '';
+                            card.spokenText = baseText + separator + currentSessionTranscript;
                             calculateSimilarity(card);
                         };
 
                         recognition.onend = () => {
-                            // Loop to keep alive unless manually stopped
                             if (card.isListening) {
-                                sessionPrefix = card.spokenText + ' ';
-                                currentSession = '';
+                                // Update Snapshot so next loop appends correctly
+                                baseText = card.spokenText;
                                 recognition.start();
                             }
                         };
@@ -460,16 +441,12 @@
                 function copySpokenToMain(index) {
                     const card = cards.value[index];
                     card.text = card.spokenText;
-                    // Trigger resize logic manually
+                    // Force resize of textarea
                     nextTick(() => {
                          const txt = document.querySelectorAll('textarea');
                          txt.forEach(t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; });
                     });
                     calculateSimilarity(card);
-                }
-
-                function copyToClipboard(text) {
-                    navigator.clipboard.writeText(text).then(() => alert("Copied to clipboard"));
                 }
 
                 function calculateSimilarity(card) {
@@ -500,9 +477,9 @@
                 const calculateElo = computed(() => 800 + (cards.value.length*10) + Math.floor(cards.value.reduce((a,c)=>a+(c.similarity||0),0)/5));
 
                 // --- 5. STORAGE ---
-                function saveLocalData() { localStorage.setItem('gambitDataV31', JSON.stringify({cards:cards.value, fen:game.fen(), idx:currentMoveIndex})); }
+                function saveLocalData() { localStorage.setItem('gambitDataV32', JSON.stringify({cards:cards.value, fen:game.fen(), idx:currentMoveIndex})); }
                 function loadLocalData() {
-                    const d = JSON.parse(localStorage.getItem('gambitDataV31'));
+                    const d = JSON.parse(localStorage.getItem('gambitDataV32'));
                     if(d) { cards.value=d.cards; game.load(d.fen); if(board) board.position(d.fen); currentMoveIndex=d.idx; cards.value.forEach(c=>c.timerActive=false); }
                 }
                 function saveData() { 
@@ -511,13 +488,13 @@
                 }
                 function triggerLoad() { document.getElementById('jsonLoad').click(); }
                 function loadData(e) { const r=new FileReader(); r.onload=ev=>{ cards.value=JSON.parse(ev.target.result); showSettings.value=false; }; r.readAsText(e.target.files[0]); }
-                function resetAll() { if(confirm("Reset Campaign?")) { cards.value=[]; game.reset(); currentMoveIndex=0; if(board) board.start(); localStorage.removeItem('gambitDataV31'); showSettings.value=false; } }
+                function resetAll() { if(confirm("Reset Campaign?")) { cards.value=[]; game.reset(); currentMoveIndex=0; if(board) board.start(); localStorage.removeItem('gambitDataV32'); showSettings.value=false; } }
 
                 return {
                     cards, showSettings, isBlindfold, autoPlayActive, selectedLang, turn, boardHeight,
                     startDrag, toggleBoard, autoResize,
                     addCard, deleteCard, toggleTimer, editTimer, formatTime, 
-                    toggleSTT, copySpokenToMain, copyToClipboard, calculateElo, toggleAutoPlay,
+                    toggleSTT, copySpokenToMain, calculateElo, toggleAutoPlay,
                     resetAll, saveData, loadData, triggerLoad
                 };
             }
