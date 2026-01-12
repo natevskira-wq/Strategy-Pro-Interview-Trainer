@@ -25,7 +25,6 @@
                         chessDark: '#262421', 
                         chessLight: '#f0d9b5',
                         accent: '#c5a076',
-                        success: '#10b981'
                     },
                     fontFamily: {
                         serif: ['Merriweather', 'serif'],
@@ -37,11 +36,13 @@
     </script>
 
     <style>
-        body { background-color: #262421; color: #e2e8f0; }
+        body { background-color: #262421; color: #e2e8f0; overscroll-behavior: none; }
         
-        /* Smooth Fade */
-        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
-        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        /* Auto-Growing Textarea */
+        textarea {
+            field-sizing: content; /* Modern browser support */
+            min-height: 80px;
+        }
 
         /* Pulse for Recording */
         .record-pulse { animation: pulse 1.5s infinite; }
@@ -50,22 +51,33 @@
             70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
+
+        /* Drag Handle */
+        .drag-handle {
+            background: repeating-linear-gradient(
+                45deg,
+                #374151,
+                #374151 10px,
+                #4b5563 10px,
+                #4b5563 20px
+            );
+            cursor: row-resize;
+            touch-action: none; /* Prevent scrolling while dragging */
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
 
     <div id="app" class="flex flex-col h-full relative">
 
-        <!-- 1. HEADER (ELO & TRACKING) -->
-        <header class="bg-gray-900 border-b border-gray-800 p-3 shrink-0 flex items-center justify-between z-20">
+        <!-- 1. HEADER -->
+        <header class="bg-gray-900 border-b border-gray-800 p-3 shrink-0 flex items-center justify-between z-30">
             <div class="flex items-center gap-3">
                 <i class="fa-solid fa-chess-knight text-2xl text-accent"></i>
                 <div>
                     <h1 class="font-serif font-bold text-sm tracking-wide text-chessLight">GAMBIT</h1>
                     <div class="flex items-center gap-2 text-[10px] text-gray-400">
                         <span><i class="fa-solid fa-trophy text-yellow-500"></i> Elo: {{ calculateElo }}</span>
-                        <span>•</span>
-                        <span>{{ cards.length }} Moves</span>
                     </div>
                 </div>
             </div>
@@ -75,121 +87,117 @@
             </button>
         </header>
 
-        <!-- 2. MAIN BOARD & CARDS -->
-        <main class="flex-1 overflow-y-auto relative bg-[#312e2b]" id="scrollContainer">
+        <!-- 2. RESIZABLE BOARD SECTION -->
+        <div class="relative shrink-0 bg-[#312e2b] border-b border-gray-700 shadow-xl z-20"
+             :style="{ height: boardHeight + 'px' }">
             
-            <!-- CHESS VISUAL (Mini Map) -->
-            <div class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-700 shadow-xl transition-all duration-300">
-                <div class="flex justify-between items-center px-4 py-2" @click="isBoardExpanded = !isBoardExpanded">
-                    <span class="text-[10px] uppercase font-bold text-gray-500 tracking-widest">
-                        {{ turn === 'w' ? 'White to Move (Interviewer)' : 'Black to Move (Candidate)' }}
-                    </span>
-                    <i class="fa-solid fa-chevron-down text-gray-500 text-xs" :class="isBoardExpanded ? 'rotate-180' : ''"></i>
-                </div>
-                
-                <div v-show="isBoardExpanded" class="pb-4 flex justify-center">
-                    <div id="myBoard" class="w-64 h-64 border-4 border-gray-700 rounded shadow-2xl"></div>
-                </div>
+            <!-- Chess Board -->
+            <div class="w-full h-full flex flex-col items-center justify-center p-2">
+                <div id="myBoard" class="aspect-square" :style="{ height: (boardHeight - 20) + 'px' }"></div>
             </div>
 
-            <!-- CARDS FEED -->
-            <div class="p-4 space-y-6 pb-32">
-                
-                <!-- Welcome State -->
-                <div v-if="cards.length === 0" class="text-center py-12 opacity-50">
-                    <i class="fa-regular fa-chess-rook text-6xl mb-4 text-gray-600"></i>
-                    <h2 class="text-xl font-serif text-chessLight">Prepare Your Opening</h2>
-                    <p class="text-sm text-gray-400 mt-2">Tap the + button to simulate an interviewer's move.</p>
+            <!-- Drag Handle -->
+            <div class="absolute bottom-0 left-0 right-0 h-4 drag-handle flex items-center justify-center border-t border-gray-600 shadow-md"
+                 @mousedown="startDrag" 
+                 @touchstart="startDrag">
+                <i class="fa-solid fa-grip-lines text-gray-400 text-xs"></i>
+            </div>
+        </div>
+
+        <!-- 3. MAIN SCROLL AREA -->
+        <main class="flex-1 overflow-y-auto relative bg-[#262421] p-4 pb-32 space-y-6" id="scrollContainer">
+            
+            <!-- Empty State -->
+            <div v-if="cards.length === 0" class="text-center py-12 opacity-50">
+                <h2 class="text-xl font-serif text-chessLight">Strategize</h2>
+                <p class="text-sm text-gray-400 mt-2">Press 'Play Move' to begin.</p>
+            </div>
+
+            <div v-for="(card, index) in cards" :key="card.id" 
+                 class="rounded-lg shadow-lg overflow-hidden border transition-all duration-300 relative"
+                 :class="card.type === 'q' ? 'bg-gray-100 border-gray-300 text-gray-900' : 'bg-gray-800 border-gray-700 text-gray-100'">
+
+                <!-- Card Header -->
+                <div class="px-4 py-2 border-b flex justify-between items-center"
+                     :class="card.type === 'q' ? 'border-gray-200 bg-gray-200' : 'border-gray-700 bg-gray-900'">
+                    <span class="text-xs font-bold uppercase tracking-wider opacity-70">
+                        {{ card.type === 'q' ? 'Opening (Question)' : 'Defense (Answer)' }}
+                    </span>
+                    
+                    <!-- Timer -->
+                    <div class="flex items-center gap-2 text-xs font-mono bg-opacity-20 bg-black px-2 py-1 rounded">
+                        <input v-if="card.isEditingTime" 
+                               type="number" 
+                               v-model.number="card.seconds" 
+                               @blur="card.isEditingTime = false"
+                               class="w-12 bg-transparent text-center border-b border-gray-500 focus:outline-none"
+                               ref="timeInput">
+                        <span v-else @click="editTimer(index)" class="cursor-pointer hover:underline">
+                            {{ formatTime(card.seconds) }}
+                        </span>
+                        <button @click="toggleTimer(index)">
+                            <i :class="card.timerActive ? 'fa-solid fa-pause text-red-500' : 'fa-solid fa-play text-green-500'"></i>
+                        </button>
+                    </div>
                 </div>
 
-                <div v-for="(card, index) in cards" :key="card.id" 
-                     class="rounded-lg shadow-lg overflow-hidden border transition-all duration-300 relative group"
-                     :class="card.type === 'q' ? 'bg-gray-100 border-gray-300 text-gray-900' : 'bg-gray-800 border-gray-700 text-gray-100'">
+                <!-- Card Body -->
+                <div class="p-4">
                     
-                    <!-- Delete Button (Absolute) -->
-                    <button @click="deleteCard(index)" class="absolute top-2 right-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-400 hover:text-red-600 z-10">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
+                    <!-- Text Area (Auto Sizing) -->
+                    <textarea v-model="card.text" 
+                              placeholder="Type here..."
+                              @input="autoResize($event)"
+                              ref="textareas"
+                              class="w-full bg-transparent resize-none outline-none text-sm font-serif leading-relaxed overflow-hidden"
+                              :class="card.type === 'q' ? 'placeholder-gray-400' : 'placeholder-gray-600'"></textarea>
 
-                    <!-- Card Header -->
-                    <div class="px-4 py-2 border-b flex justify-between items-center"
-                         :class="card.type === 'q' ? 'border-gray-200 bg-gray-200' : 'border-gray-700 bg-gray-900'">
-                        <span class="text-xs font-bold uppercase tracking-wider opacity-70">
-                            {{ card.type === 'q' ? 'The Opening (Question)' : 'The Defense (Answer)' }}
-                        </span>
+                    <!-- STT Section (Answers Only) -->
+                    <div v-if="card.type === 'a'" class="mt-4 pt-4 border-t border-gray-700">
                         
-                        <!-- Editable Timer -->
-                        <div class="flex items-center gap-2 text-xs font-mono bg-opacity-20 bg-black px-2 py-1 rounded">
-                            <i class="fa-solid fa-stopwatch opacity-50"></i>
+                        <!-- STT Header -->
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[10px] uppercase text-gray-500 font-bold">Verbal Transcript</span>
                             
-                            <!-- Timer Input Mode -->
-                            <input v-if="card.isEditingTime" 
-                                   type="number" 
-                                   v-model.number="card.seconds" 
-                                   @blur="card.isEditingTime = false"
-                                   class="w-12 bg-transparent text-center border-b border-gray-500 focus:outline-none"
-                                   ref="timeInput">
-                            <!-- Timer Display Mode -->
-                            <span v-else @click="editTimer(index)" class="cursor-pointer hover:underline">
-                                {{ formatTime(card.seconds) }}
-                            </span>
-
-                            <button @click="toggleTimer(index)">
-                                <i :class="card.timerActive ? 'fa-solid fa-pause text-red-500' : 'fa-solid fa-play text-green-500'"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Card Body -->
-                    <div class="p-4">
-                        
-                        <!-- Blindfold Mask -->
-                        <div v-if="isBlindfold && card.type === 'a' && !card.revealed" 
-                             class="absolute inset-x-0 bottom-0 top-10 bg-gray-800 z-10 flex flex-col items-center justify-center cursor-pointer"
-                             @click="card.revealed = true">
-                            <i class="fa-solid fa-mask text-4xl text-gray-600 mb-2"></i>
-                            <span class="text-xs font-bold text-gray-500 uppercase">Blindfold Mode</span>
-                        </div>
-
-                        <!-- TEXTAREA (Fixes writing bug) -->
-                        <textarea v-model="card.text" 
-                                  placeholder="Write your strategy..."
-                                  class="w-full bg-transparent resize-none outline-none text-sm font-serif leading-relaxed h-24 p-0"
-                                  :class="card.type === 'q' ? 'placeholder-gray-400' : 'placeholder-gray-600'"></textarea>
-
-                        <!-- STT Feedback Area (Only for Answers) -->
-                        <div v-if="card.type === 'a'" class="mt-4 pt-4 border-t border-gray-700">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-[10px] uppercase text-gray-500 font-bold">Verbal Defense</span>
-                                <div v-if="card.similarity > 0" class="text-xs font-bold" :class="getScoreColor(card.similarity)">
-                                    {{ card.similarity }}% Accuracy
-                                </div>
-                            </div>
-                            
-                            <div class="bg-black/30 rounded p-2 text-xs italic text-gray-400 min-h-[40px]">
-                                {{ card.spokenText || 'Tap microphone to start speaking...' }}
-                            </div>
-
-                            <!-- STT Controls -->
-                            <div class="mt-2 flex justify-end">
+                            <!-- STT Toolbar -->
+                            <div class="flex items-center gap-2">
+                                <button v-if="card.spokenText" @click="copySpokenToMain(index)" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded" title="Use this as answer">
+                                    <i class="fa-solid fa-arrow-up"></i> Use
+                                </button>
+                                <button v-if="card.spokenText" @click="copyToClipboard(card.spokenText)" class="text-xs bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
                                 <button @click="toggleSTT(index)" 
-                                        class="w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg"
-                                        :class="card.isListening ? 'bg-red-600 text-white record-pulse' : 'bg-gray-700 text-gray-300'">
+                                        class="w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg text-white"
+                                        :class="card.isListening ? 'bg-red-600 record-pulse' : 'bg-gray-600 hover:bg-gray-500'">
                                     <i :class="card.isListening ? 'fa-solid fa-microphone' : 'fa-solid fa-microphone-slash'"></i>
                                 </button>
                             </div>
                         </div>
+                        
+                        <!-- Spoken Text Area -->
+                        <div class="bg-black/30 rounded p-3 text-xs italic text-gray-300 min-h-[40px] whitespace-pre-wrap leading-relaxed border border-gray-700/50">
+                            {{ card.spokenText || 'Microphone history will accumulate here...' }}
+                        </div>
                     </div>
+                </div>
+
+                <!-- Footer (Delete Button) -->
+                <div class="bg-black/10 px-4 py-2 flex justify-between items-center">
+                    <div class="text-[10px] text-gray-500 font-mono">
+                        {{ card.similarity > 0 ? card.similarity + '% Match' : '' }}
+                    </div>
+                    <button @click="deleteCard(index)" class="text-xs text-red-400 hover:text-red-200 flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
                 </div>
 
             </div>
         </main>
 
-        <!-- 3. FOOTER CONTROLS -->
-        <footer class="bg-gray-900 border-t border-gray-800 p-4 shrink-0 z-20 pb-safe">
+        <!-- 4. FOOTER CONTROLS -->
+        <footer class="bg-gray-900 border-t border-gray-800 p-4 shrink-0 z-30 pb-safe">
             <div class="grid grid-cols-4 gap-3 max-w-md mx-auto">
-                
-                <!-- Auto Play -->
                 <button @click="toggleAutoPlay" 
                         class="col-span-1 flex flex-col items-center justify-center rounded-lg transition-colors py-2"
                         :class="autoPlayActive ? 'bg-red-900/30 text-red-500' : 'text-gray-500'">
@@ -197,7 +205,6 @@
                     <span class="text-[9px] uppercase font-bold">Auto</span>
                 </button>
 
-                <!-- ADD CARD (Main Action) -->
                 <button @click="addCard" 
                         class="col-span-2 bg-accent hover:bg-[#b08d65] text-gray-900 rounded-xl shadow-lg shadow-yellow-900/20 flex flex-col items-center justify-center active:scale-95 transition-transform">
                     <span class="text-lg font-bold font-serif">Play Move</span>
@@ -206,7 +213,6 @@
                     </span>
                 </button>
 
-                <!-- Blindfold Toggle -->
                 <button @click="isBlindfold = !isBlindfold" 
                         class="col-span-1 flex flex-col items-center justify-center rounded-lg transition-colors py-2"
                         :class="isBlindfold ? 'bg-blue-900/30 text-blue-400' : 'text-gray-500'">
@@ -216,38 +222,28 @@
             </div>
         </footer>
 
-        <!-- 4. SETTINGS MODAL -->
+        <!-- SETTINGS (Hidden by default) -->
         <div v-if="showSettings" class="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl">
-                <div class="p-4 border-b border-gray-700 flex justify-between items-center">
-                    <h3 class="font-serif font-bold text-chessLight">Strategy Settings</h3>
-                    <button @click="showSettings = false" class="text-gray-400"><i class="fa-solid fa-xmark"></i></button>
-                </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl p-4 space-y-4">
+                <h3 class="font-serif font-bold text-chessLight">Settings</h3>
                 
-                <div class="p-4 space-y-4">
-                    <!-- Language Selector -->
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 uppercase block mb-2">STT Language</label>
-                        <select v-model="selectedLang" class="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded p-2 text-sm">
-                            <option value="en-US">🇺🇸 English (US)</option>
-                            <option value="en-GB">🇬🇧 English (UK)</option>
-                            <option value="de-DE">🇩🇪 German (Deutsch)</option>
-                            <option value="fr-FR">🇫🇷 French (Français)</option>
-                            <option value="es-ES">🇪🇸 Spanish (Español)</option>
-                        </select>
-                    </div>
-
-                    <!-- File Ops -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <button @click="saveData" class="py-3 bg-gray-700 rounded hover:bg-gray-600 text-xs font-bold uppercase"><i class="fa-solid fa-download mr-1"></i> Save JSON</button>
-                        <button @click="triggerLoad" class="py-3 bg-gray-700 rounded hover:bg-gray-600 text-xs font-bold uppercase"><i class="fa-solid fa-upload mr-1"></i> Load JSON</button>
-                        <input type="file" id="jsonLoad" class="hidden" accept=".json" @change="loadData">
-                    </div>
-
-                    <button @click="resetAll" class="w-full py-3 border border-red-900/50 text-red-500 rounded text-xs font-bold uppercase hover:bg-red-900/10">
-                        <i class="fa-solid fa-trash mr-1"></i> Reset Campaign
-                    </button>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase block mb-2">STT Language</label>
+                    <select v-model="selectedLang" class="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded p-2 text-sm">
+                        <option value="en-US">🇺🇸 English</option>
+                        <option value="de-DE">🇩🇪 German</option>
+                        <option value="fr-FR">🇫🇷 French</option>
+                    </select>
                 </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <button @click="saveData" class="py-3 bg-gray-700 rounded text-xs font-bold uppercase"><i class="fa-solid fa-download mr-1"></i> Save</button>
+                    <button @click="triggerLoad" class="py-3 bg-gray-700 rounded text-xs font-bold uppercase"><i class="fa-solid fa-upload mr-1"></i> Load</button>
+                    <input type="file" id="jsonLoad" class="hidden" accept=".json" @change="loadData">
+                </div>
+
+                <button @click="resetAll" class="w-full py-3 border border-red-900/50 text-red-500 rounded text-xs font-bold uppercase">Reset</button>
+                <button @click="showSettings = false" class="w-full py-3 bg-gray-900 text-white rounded text-sm">Close</button>
             </div>
         </div>
 
@@ -255,28 +251,25 @@
 
     <script>
         const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
-
-        // A famous game to loop through visually (Morphy vs Duke)
         const PGN_SEQUENCE = `1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#`;
 
         createApp({
             setup() {
-                // State
                 const cards = ref([]);
                 const showSettings = ref(false);
-                const isBoardExpanded = ref(true);
                 const isBlindfold = ref(false);
                 const autoPlayActive = ref(false);
-                const selectedLang = ref('en-US'); // Default Language
+                const selectedLang = ref('en-US');
                 const turn = ref('w');
+                const boardHeight = ref(250); // Initial board height
 
-                // Chess Logic
+                // Chess
                 const game = new Chess();
                 let board = null;
                 let moveQueue = [];
                 let currentMoveIndex = 0;
 
-                // Utils
+                // Tools
                 let timerIntervals = {};
                 let autoPlayInterval = null;
                 let recognition = null;
@@ -288,71 +281,176 @@
                 });
 
                 watch(cards, () => saveLocalData(), { deep: true });
-                watch(selectedLang, () => {
-                    if(recognition) {
-                        recognition.lang = selectedLang.value;
-                        console.log("Language switched to", selectedLang.value);
-                    }
-                });
+                watch(selectedLang, () => { if(recognition) recognition.lang = selectedLang.value; });
 
-                // --- 1. GAME LOGIC ---
+                // --- 1. RESIZABLE BOARD ---
+                function startDrag(e) {
+                    e.preventDefault(); // Prevent text selection
+                    window.addEventListener('mousemove', onDrag);
+                    window.addEventListener('mouseup', stopDrag);
+                    window.addEventListener('touchmove', onDrag);
+                    window.addEventListener('touchend', stopDrag);
+                }
+
+                function onDrag(e) {
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    // Limit min/max height
+                    const newHeight = Math.max(100, Math.min(clientY, 500)); 
+                    boardHeight.value = newHeight;
+                    if(board) board.resize();
+                }
+
+                function stopDrag() {
+                    window.removeEventListener('mousemove', onDrag);
+                    window.removeEventListener('mouseup', stopDrag);
+                    window.removeEventListener('touchmove', onDrag);
+                    window.removeEventListener('touchend', stopDrag);
+                    if(board) board.resize();
+                }
+
+                // --- 2. TEXTAREA AUTO-RESIZE ---
+                function autoResize(event) {
+                    const el = event.target;
+                    el.style.height = 'auto'; // Reset
+                    el.style.height = el.scrollHeight + 'px'; // Expand
+                }
+                
+                // --- 3. CORE LOGIC ---
                 function initChess() {
-                    // Pre-load the game for visual effect
                     game.load_pgn(PGN_SEQUENCE);
                     moveQueue = game.history({ verbose: true });
-                    game.reset(); // clear board
-                    
-                    board = Chessboard('myBoard', {
-                        position: 'start',
-                        draggable: false, // Visual only
-                        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-                    });
-                    
+                    game.reset();
+                    board = Chessboard('myBoard', { position: 'start', draggable: false, pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' });
                     window.addEventListener('resize', board.resize);
                 }
 
                 function addCard() {
-                    // 1. Advance Chess Board Visual
                     if (currentMoveIndex < moveQueue.length) {
                         game.move(moveQueue[currentMoveIndex]);
                         board.position(game.fen());
                         currentMoveIndex++;
-                    } else {
-                        // Loop game or just flip turn visually
-                        // For simplicity, just flip turn state
                     }
-                    
                     turn.value = game.turn();
+                    const isWhite = (currentMoveIndex % 2 !== 0);
 
-                    // 2. Add Data Card
-                    // Logic: Even moves (0, 2...) are White (Question), Odd are Black (Answer)
-                    // Note: moveQueue index 0 is White's first move.
-                    const isWhite = (currentMoveIndex % 2 !== 0); // After increment, if 1 (odd), it was white's move
-                    
                     cards.value.push({
                         id: Date.now(),
-                        type: isWhite ? 'q' : 'a', 
+                        type: isWhite ? 'q' : 'a',
                         text: '',
                         spokenText: '',
                         similarity: 0,
                         seconds: 0,
                         timerActive: false,
                         isEditingTime: false,
-                        isListening: false,
-                        revealed: false
+                        isListening: false
                     });
 
-                    scrollToBottom();
+                    nextTick(() => {
+                        const el = document.getElementById('scrollContainer');
+                        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                        // Trigger auto-resize on new card textareas
+                        const textareas = document.querySelectorAll('textarea');
+                        if(textareas.length) textareas[textareas.length-1].style.height = '80px';
+                    });
                 }
 
                 function deleteCard(index) {
-                    if(!confirm("Remove this strategic line?")) return;
-                    cards.value.splice(index, 1);
-                    // Note: We do NOT rollback the chess board to keep logic simple. 
-                    // The board is a metaphor, not a database constraint.
+                    if(confirm("Delete this card?")) cards.value.splice(index, 1);
                 }
 
-                // --- 2. TIMERS & EDITING ---
+                // --- 4. STT ENHANCED ---
+                function initSTT() {
+                    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        recognition = new SpeechRecognition();
+                        recognition.continuous = true; // Keep listening
+                        recognition.interimResults = true;
+                        recognition.lang = selectedLang.value;
+                    }
+                }
+
+                function toggleSTT(index) {
+                    if (!recognition) return alert("Browser not supported");
+                    const card = cards.value[index];
+
+                    if (card.isListening) {
+                        recognition.stop();
+                        card.isListening = false;
+                    } else {
+                        // Stop others
+                        cards.value.forEach(c => c.isListening = false);
+                        
+                        card.isListening = true;
+                        recognition.lang = selectedLang.value;
+                        
+                        // Append logic: Add a space if there's existing text
+                        let initialText = card.spokenText ? card.spokenText + ' ' : '';
+                        let currentSessionText = '';
+
+                        recognition.start();
+
+                        recognition.onresult = (e) => {
+                            let interim = '';
+                            let finalChunk = '';
+
+                            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                                if (e.results[i].isFinal) {
+                                    finalChunk += e.results[i][0].transcript;
+                                } else {
+                                    interim += e.results[i][0].transcript;
+                                }
+                            }
+                            
+                            if (finalChunk) {
+                                currentSessionText += finalChunk;
+                            }
+
+                            // Update UI: Persisted History + Current Session + Interim
+                            card.spokenText = (initialText + currentSessionText + interim).trim();
+                            calculateSimilarity(card);
+                        };
+
+                        recognition.onend = () => {
+                            // If user didn't manually stop, restart (keep alive)
+                            // Note: We commit the session text to initialText for the next loop
+                            if (card.isListening) {
+                                initialText = card.spokenText + ' ';
+                                currentSessionText = '';
+                                recognition.start();
+                            }
+                        };
+                    }
+                }
+
+                function copySpokenToMain(index) {
+                    const card = cards.value[index];
+                    card.text = card.spokenText;
+                    // Trigger resize on the textarea
+                    nextTick(() => {
+                        const textareas = document.querySelectorAll('textarea');
+                        // Find the textarea corresponding to this index (roughly)
+                        // A better way is using refs, but global query works for simple lists
+                         // Simplified: just resize all to fit content
+                        textareas.forEach(el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; });
+                    });
+                    calculateSimilarity(card);
+                }
+
+                function copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => alert("Copied!"));
+                }
+
+                function calculateSimilarity(card) {
+                    if(!card.text || !card.spokenText) return;
+                    const normalize = (str) => str.toLowerCase().replace(/[^\p{L}\s]/gu, '').split(/\s+/);
+                    const s1 = new Set(normalize(card.text));
+                    const s2 = new Set(normalize(card.spokenText));
+                    const intersection = new Set([...s1].filter(x => s2.has(x)));
+                    const union = new Set([...s1, ...s2]);
+                    card.similarity = Math.round((intersection.size / union.size) * 100);
+                }
+
+                // --- 5. TIMERS & UTILS ---
                 function toggleTimer(index) {
                     const card = cards.value[index];
                     if (card.timerActive) {
@@ -363,151 +461,38 @@
                         timerIntervals[card.id] = setInterval(() => card.seconds++, 1000);
                     }
                 }
+                function formatTime(s) { return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }
+                function editTimer(index) { cards.value[index].isEditingTime = true; nextTick(() => document.querySelectorAll('input[type="number"]')[0]?.focus()); }
 
-                function editTimer(index) {
-                    cards.value[index].isEditingTime = true;
-                    // Focus input on next tick
-                    nextTick(() => {
-                        const inputs = document.querySelectorAll('input[type="number"]');
-                        if(inputs.length) inputs[inputs.length-1].focus();
-                    });
-                }
-
-                function formatTime(s) {
-                    const m = Math.floor(s / 60);
-                    const sec = s % 60;
-                    return `${m}:${sec.toString().padStart(2, '0')}`;
-                }
-
-                // --- 3. STT (GERMAN SUPPORT) ---
-                function initSTT() {
-                    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                        recognition = new SpeechRecognition();
-                        recognition.continuous = true;
-                        recognition.interimResults = true;
-                        recognition.lang = selectedLang.value; // Set initial lang
-                    }
-                }
-
-                function toggleSTT(index) {
-                    if (!recognition) return alert("Browser does not support Speech API");
-                    
-                    const card = cards.value[index];
-                    
-                    if (card.isListening) {
-                        recognition.stop();
-                        card.isListening = false;
-                    } else {
-                        // Stop others
-                        cards.value.forEach(c => c.isListening = false);
-                        
-                        // Config & Start
-                        recognition.lang = selectedLang.value; // Ensure current lang is used
-                        card.isListening = true;
-                        recognition.start();
-
-                        recognition.onresult = (e) => {
-                            let transcript = '';
-                            for (let i = e.resultIndex; i < e.results.length; ++i) {
-                                transcript += e.results[i][0].transcript;
-                            }
-                            card.spokenText = transcript;
-                            calculateSimilarity(card);
-                        };
-
-                        recognition.onend = () => {
-                            if (card.isListening) recognition.start(); // Auto restart
-                        };
-                    }
-                }
-
-                function calculateSimilarity(card) {
-                    if(!card.text || !card.spokenText) return;
-                    
-                    // Simple Tokenizer (works for DE/EN)
-                    const normalize = (str) => str.toLowerCase().replace(/[^\p{L}\s]/gu, '').split(/\s+/);
-                    const s1 = new Set(normalize(card.text));
-                    const s2 = new Set(normalize(card.spokenText));
-                    
-                    const intersection = new Set([...s1].filter(x => s2.has(x)));
-                    const union = new Set([...s1, ...s2]);
-                    
-                    card.similarity = Math.round((intersection.size / union.size) * 100);
-                }
-
-                // --- 4. DATA & UTILS ---
                 function toggleAutoPlay() {
                     autoPlayActive.value = !autoPlayActive.value;
-                    if(autoPlayActive.value) {
-                        addCard(); // Immediate
-                        autoPlayInterval = setInterval(addCard, 4000);
-                    } else {
-                        clearInterval(autoPlayInterval);
-                    }
-                }
-
-                function scrollToBottom() {
-                    nextTick(() => {
-                        const el = document.getElementById('scrollContainer');
-                        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-                    });
+                    if(autoPlayActive.value) { addCard(); autoPlayInterval = setInterval(addCard, 4000); } 
+                    else clearInterval(autoPlayInterval);
                 }
 
                 const calculateElo = computed(() => {
-                    const base = 800;
-                    const bonus = cards.value.length * 10;
-                    const accuracyBonus = cards.value.reduce((acc, c) => acc + (c.similarity || 0), 0);
-                    return base + bonus + Math.floor(accuracyBonus / 5);
+                    return 800 + (cards.value.length * 10) + Math.floor(cards.value.reduce((a,c)=>a+(c.similarity||0),0)/5);
                 });
 
-                function getScoreColor(score) {
-                    if(score > 75) return 'text-green-500';
-                    if(score > 40) return 'text-yellow-500';
-                    return 'text-red-500';
-                }
-
-                // Storage
-                function saveLocalData() {
-                    const payload = { cards: cards.value, fen: game.fen(), idx: currentMoveIndex, lang: selectedLang.value };
-                    localStorage.setItem('gambitData', JSON.stringify(payload));
-                }
+                // File I/O
+                function saveLocalData() { localStorage.setItem('gambitDataV3', JSON.stringify({cards:cards.value, fen:game.fen(), idx:currentMoveIndex})); }
                 function loadLocalData() {
-                    const d = JSON.parse(localStorage.getItem('gambitData'));
-                    if(d) {
-                        cards.value = d.cards;
-                        game.load(d.fen);
-                        board.position(d.fen);
-                        currentMoveIndex = d.idx;
-                        if(d.lang) selectedLang.value = d.lang;
-                        cards.value.forEach(c => c.timerActive = false); // pause all
-                    }
+                    const d = JSON.parse(localStorage.getItem('gambitDataV3'));
+                    if(d) { cards.value=d.cards; game.load(d.fen); board.position(d.fen); currentMoveIndex=d.idx; cards.value.forEach(c=>c.timerActive=false); }
                 }
-                function saveData() {
+                function saveData() { 
                     const blob = new Blob([JSON.stringify(cards.value)], {type:'application/json'});
-                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gambit_strategy.json'; a.click();
+                    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='gambit.json'; a.click(); 
                 }
                 function triggerLoad() { document.getElementById('jsonLoad').click(); }
-                function loadData(e) {
-                    const r = new FileReader();
-                    r.onload = ev => { cards.value = JSON.parse(ev.target.result); showSettings.value = false; };
-                    r.readAsText(e.target.files[0]);
-                }
-                function resetAll() {
-                    if(confirm("Forfeit current game?")) {
-                        cards.value = [];
-                        game.reset();
-                        currentMoveIndex = 0;
-                        board.start();
-                        localStorage.removeItem('gambitData');
-                        showSettings.value = false;
-                    }
-                }
+                function loadData(e) { const r=new FileReader(); r.onload=ev=>{ cards.value=JSON.parse(ev.target.result); showSettings.value=false; }; r.readAsText(e.target.files[0]); }
+                function resetAll() { if(confirm("Reset?")) { cards.value=[]; game.reset(); currentMoveIndex=0; board.start(); localStorage.removeItem('gambitDataV3'); showSettings.value=false; } }
 
                 return {
-                    cards, isBoardExpanded, isBlindfold, showSettings, autoPlayActive, selectedLang, turn,
+                    cards, showSettings, isBlindfold, autoPlayActive, selectedLang, turn, boardHeight,
+                    startDrag, autoResize,
                     addCard, deleteCard, toggleTimer, editTimer, formatTime, 
-                    toggleSTT, getScoreColor, calculateElo, toggleAutoPlay,
+                    toggleSTT, copySpokenToMain, copyToClipboard, calculateElo, toggleAutoPlay,
                     resetAll, saveData, loadData, triggerLoad
                 };
             }
