@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Interview Flow - Mobile Trainer</title>
+    <title>Gambit - Interview Strategist</title>
     
     <!-- LIBRARIES -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
 
     <!-- SCRIPTS -->
@@ -21,349 +21,494 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { primary: '#4f46e5', secondary: '#10b981' }
+                    colors: { 
+                        chessDark: '#262421', 
+                        chessLight: '#f0d9b5',
+                        accent: '#c5a076',
+                        success: '#10b981'
+                    },
+                    fontFamily: {
+                        serif: ['Merriweather', 'serif'],
+                        sans: ['Inter', 'sans-serif']
+                    }
                 }
             }
         }
     </script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #262421; color: #e2e8f0; }
         
-        /* Blindfold Mask Style */
-        .blindfold-mask {
-            position: absolute; inset: 0;
-            background: #e0e7ff; opacity: 0.98;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            z-index: 10; cursor: pointer;
-            color: #4338ca; font-weight: bold; text-align: center;
-        }
-        
-        .stt-active { animation: pulse-red 1.5s infinite; }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        /* Smooth Fade */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+        /* Pulse for Recording */
+        .record-pulse { animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden text-slate-800">
+<body class="h-screen flex flex-col overflow-hidden">
 
     <div id="app" class="flex flex-col h-full relative">
 
-        <!-- HEADER -->
-        <header class="bg-white shadow-sm shrink-0 px-4 py-3 flex items-center justify-between z-20">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
-                    <i class="fa-solid fa-microphone-lines"></i>
-                </div>
+        <!-- 1. HEADER (ELO & TRACKING) -->
+        <header class="bg-gray-900 border-b border-gray-800 p-3 shrink-0 flex items-center justify-between z-20">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-chess-knight text-2xl text-accent"></i>
                 <div>
-                    <h1 class="font-bold text-sm leading-none">InterviewFlow</h1>
-                    <span class="text-[10px] text-gray-500 font-mono">
-                        {{ autoPlayActive ? 'AUTO-PLAY ON' : 'Manual Mode' }}
-                    </span>
+                    <h1 class="font-serif font-bold text-sm tracking-wide text-chessLight">GAMBIT</h1>
+                    <div class="flex items-center gap-2 text-[10px] text-gray-400">
+                        <span><i class="fa-solid fa-trophy text-yellow-500"></i> Elo: {{ calculateElo }}</span>
+                        <span>•</span>
+                        <span>{{ cards.length }} Moves</span>
+                    </div>
                 </div>
             </div>
             
-            <div class="flex gap-4">
-                <!-- BLINDFOLD TOGGLE -->
-                <button @click="isBlindfold = !isBlindfold" class="transition-colors"
-                    :class="isBlindfold ? 'text-primary' : 'text-gray-300'">
-                    <i :class="isBlindfold ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
-                </button>
-
-                <button @click="showSettings = !showSettings" class="text-gray-400 hover:text-primary">
-                    <i class="fa-solid fa-sliders"></i>
-                </button>
-            </div>
+            <button @click="showSettings = true" class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white">
+                <i class="fa-solid fa-gear"></i>
+            </button>
         </header>
 
-        <!-- SETTINGS OVERLAY -->
-        <div v-if="showSettings" class="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-                <h3 class="font-bold text-lg">Menu</h3>
-                <div class="space-y-2">
-                    <button @click="downloadData" class="w-full py-3 border rounded-lg text-sm"><i class="fa-solid fa-download mr-2"></i> Save JSON</button>
-                    <button @click="triggerLoad" class="w-full py-3 border rounded-lg text-sm"><i class="fa-solid fa-upload mr-2"></i> Load JSON</button>
-                    <input type="file" id="fileInput" class="hidden" accept=".json" @change="loadFromFile">
-                    <button @click="resetAll" class="w-full py-3 bg-red-50 text-red-500 rounded-lg text-sm font-bold"><i class="fa-solid fa-trash mr-2"></i> Reset</button>
-                </div>
-                <button @click="showSettings = false" class="w-full py-3 bg-gray-900 text-white rounded-lg">Close</button>
-            </div>
-        </div>
-
-        <!-- MAIN SCROLL AREA -->
-        <main class="flex-1 overflow-y-auto overflow-x-hidden relative bg-slate-100" id="mainScroll">
+        <!-- 2. MAIN BOARD & CARDS -->
+        <main class="flex-1 overflow-y-auto relative bg-[#312e2b]" id="scrollContainer">
             
-            <!-- CHESS VISUAL (Collapsible) -->
-            <div class="bg-white border-b p-2">
-                <div class="flex justify-between items-center px-2" @click="isBoardCollapsed = !isBoardCollapsed">
-                    <span class="text-[10px] font-bold text-gray-400 uppercase">Current Board State</span>
-                    <i class="fa-solid fa-chevron-down text-gray-400 text-xs" :class="isBoardCollapsed ? '' : 'rotate-180'"></i>
+            <!-- CHESS VISUAL (Mini Map) -->
+            <div class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-700 shadow-xl transition-all duration-300">
+                <div class="flex justify-between items-center px-4 py-2" @click="isBoardExpanded = !isBoardExpanded">
+                    <span class="text-[10px] uppercase font-bold text-gray-500 tracking-widest">
+                        {{ turn === 'w' ? 'White to Move (Interviewer)' : 'Black to Move (Candidate)' }}
+                    </span>
+                    <i class="fa-solid fa-chevron-down text-gray-500 text-xs" :class="isBoardExpanded ? 'rotate-180' : ''"></i>
                 </div>
-                <div v-show="!isBoardCollapsed" class="mt-2 mx-auto max-w-[200px]">
-                    <div id="myBoard" class="w-full"></div>
+                
+                <div v-show="isBoardExpanded" class="pb-4 flex justify-center">
+                    <div id="myBoard" class="w-64 h-64 border-4 border-gray-700 rounded shadow-2xl"></div>
                 </div>
             </div>
 
-            <!-- CARDS -->
-            <div class="p-4 pb-32 space-y-4">
+            <!-- CARDS FEED -->
+            <div class="p-4 space-y-6 pb-32">
                 
-                <div v-if="cards.length === 0" class="text-center py-10 opacity-40">
-                    <i class="fa-solid fa-play-circle text-5xl mb-2"></i>
-                    <p>Press Play or Next to start</p>
+                <!-- Welcome State -->
+                <div v-if="cards.length === 0" class="text-center py-12 opacity-50">
+                    <i class="fa-regular fa-chess-rook text-6xl mb-4 text-gray-600"></i>
+                    <h2 class="text-xl font-serif text-chessLight">Prepare Your Opening</h2>
+                    <p class="text-sm text-gray-400 mt-2">Tap the + button to simulate an interviewer's move.</p>
                 </div>
 
                 <div v-for="(card, index) in cards" :key="card.id" 
-                     class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative transition-all duration-300">
+                     class="rounded-lg shadow-lg overflow-hidden border transition-all duration-300 relative group"
+                     :class="card.type === 'q' ? 'bg-gray-100 border-gray-300 text-gray-900' : 'bg-gray-800 border-gray-700 text-gray-100'">
                     
-                    <!-- HEADER -->
-                    <div class="px-3 py-2 flex justify-between items-center border-b border-gray-100" 
-                         :class="card.type === 'q' ? 'bg-gray-50' : 'bg-indigo-50'">
-                        <span class="text-xs font-bold uppercase" :class="card.type === 'q' ? 'text-gray-500' : 'text-indigo-600'">
-                            {{ card.type === 'q' ? 'Interviewer' : 'My Answer' }}
+                    <!-- Delete Button (Absolute) -->
+                    <button @click="deleteCard(index)" class="absolute top-2 right-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-400 hover:text-red-600 z-10">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+
+                    <!-- Card Header -->
+                    <div class="px-4 py-2 border-b flex justify-between items-center"
+                         :class="card.type === 'q' ? 'border-gray-200 bg-gray-200' : 'border-gray-700 bg-gray-900'">
+                        <span class="text-xs font-bold uppercase tracking-wider opacity-70">
+                            {{ card.type === 'q' ? 'The Opening (Question)' : 'The Defense (Answer)' }}
                         </span>
-                        <!-- TIMER -->
-                        <div class="flex items-center gap-2 text-xs font-mono bg-white px-2 rounded border">
-                            {{ formatTime(card.seconds) }}
+                        
+                        <!-- Editable Timer -->
+                        <div class="flex items-center gap-2 text-xs font-mono bg-opacity-20 bg-black px-2 py-1 rounded">
+                            <i class="fa-solid fa-stopwatch opacity-50"></i>
+                            
+                            <!-- Timer Input Mode -->
+                            <input v-if="card.isEditingTime" 
+                                   type="number" 
+                                   v-model.number="card.seconds" 
+                                   @blur="card.isEditingTime = false"
+                                   class="w-12 bg-transparent text-center border-b border-gray-500 focus:outline-none"
+                                   ref="timeInput">
+                            <!-- Timer Display Mode -->
+                            <span v-else @click="editTimer(index)" class="cursor-pointer hover:underline">
+                                {{ formatTime(card.seconds) }}
+                            </span>
+
                             <button @click="toggleTimer(index)">
                                 <i :class="card.timerActive ? 'fa-solid fa-pause text-red-500' : 'fa-solid fa-play text-green-500'"></i>
                             </button>
                         </div>
                     </div>
 
-                    <!-- CONTENT AREA (With Blindfold Logic) -->
-                    <div class="relative p-3 min-h-[80px]">
+                    <!-- Card Body -->
+                    <div class="p-4">
                         
-                        <!-- BLINDFOLD OVERLAY (Only for Answers) -->
+                        <!-- Blindfold Mask -->
                         <div v-if="isBlindfold && card.type === 'a' && !card.revealed" 
-                             class="blindfold-mask rounded"
+                             class="absolute inset-x-0 bottom-0 top-10 bg-gray-800 z-10 flex flex-col items-center justify-center cursor-pointer"
                              @click="card.revealed = true">
-                            <i class="fa-solid fa-lock text-2xl mb-2"></i>
-                            <span class="text-xs">Notes Hidden<br>Tap to Reveal</span>
+                            <i class="fa-solid fa-mask text-4xl text-gray-600 mb-2"></i>
+                            <span class="text-xs font-bold text-gray-500 uppercase">Blindfold Mode</span>
                         </div>
 
-                        <!-- Editable Text -->
-                        <div contenteditable="true" 
-                             class="w-full outline-none text-sm text-gray-700"
-                             :data-placeholder="card.type === 'q' ? 'Question...' : 'Keywords...'"
-                             @input="updateText($event, index, 'text')"
-                             v-html="card.text">
-                        </div>
-                    </div>
+                        <!-- TEXTAREA (Fixes writing bug) -->
+                        <textarea v-model="card.text" 
+                                  placeholder="Write your strategy..."
+                                  class="w-full bg-transparent resize-none outline-none text-sm font-serif leading-relaxed h-24 p-0"
+                                  :class="card.type === 'q' ? 'placeholder-gray-400' : 'placeholder-gray-600'"></textarea>
 
-                    <!-- STT FOOTER (Answers Only) -->
-                    <div v-if="card.type === 'a'" class="px-3 pb-3 pt-0">
-                        <div class="border-t border-dashed my-2"></div>
-                        <div class="flex gap-3 items-start">
-                            <button @click="toggleSTT(index)" 
-                                    class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all"
-                                    :class="card.isListening ? 'bg-red-500 text-white stt-active' : 'bg-gray-100 text-gray-400'">
-                                <i :class="card.isListening ? 'fa-solid fa-microphone' : 'fa-solid fa-microphone-slash'"></i>
-                            </button>
-                            <div class="flex-1">
-                                <div class="bg-gray-50 rounded p-2 text-xs italic text-gray-600 mb-1">
-                                    {{ card.spokenText || 'Spoken text will appear here...' }}
+                        <!-- STT Feedback Area (Only for Answers) -->
+                        <div v-if="card.type === 'a'" class="mt-4 pt-4 border-t border-gray-700">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] uppercase text-gray-500 font-bold">Verbal Defense</span>
+                                <div v-if="card.similarity > 0" class="text-xs font-bold" :class="getScoreColor(card.similarity)">
+                                    {{ card.similarity }}% Accuracy
                                 </div>
-                                <div v-if="card.spokenText && card.text" class="flex items-center gap-2">
-                                    <div class="h-1 flex-1 bg-gray-200 rounded overflow-hidden">
-                                        <div class="h-full bg-green-500" :style="{ width: card.similarity + '%' }"></div>
-                                    </div>
-                                    <span class="text-[10px] font-bold">{{ card.similarity }}%</span>
-                                </div>
+                            </div>
+                            
+                            <div class="bg-black/30 rounded p-2 text-xs italic text-gray-400 min-h-[40px]">
+                                {{ card.spokenText || 'Tap microphone to start speaking...' }}
+                            </div>
+
+                            <!-- STT Controls -->
+                            <div class="mt-2 flex justify-end">
+                                <button @click="toggleSTT(index)" 
+                                        class="w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg"
+                                        :class="card.isListening ? 'bg-red-600 text-white record-pulse' : 'bg-gray-700 text-gray-300'">
+                                    <i :class="card.isListening ? 'fa-solid fa-microphone' : 'fa-solid fa-microphone-slash'"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
+
             </div>
         </main>
 
-        <!-- FOOTER CONTROLS -->
-        <footer class="bg-white border-t p-3 pb-6 z-30">
-            <div class="grid grid-cols-4 gap-3 max-w-lg mx-auto">
+        <!-- 3. FOOTER CONTROLS -->
+        <footer class="bg-gray-900 border-t border-gray-800 p-4 shrink-0 z-20 pb-safe">
+            <div class="grid grid-cols-4 gap-3 max-w-md mx-auto">
                 
-                <!-- AUTO PLAY TOGGLE -->
+                <!-- Auto Play -->
                 <button @click="toggleAutoPlay" 
-                        class="col-span-1 rounded-lg flex flex-col items-center justify-center py-2 transition-colors"
-                        :class="autoPlayActive ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-600'">
+                        class="col-span-1 flex flex-col items-center justify-center rounded-lg transition-colors py-2"
+                        :class="autoPlayActive ? 'bg-red-900/30 text-red-500' : 'text-gray-500'">
                     <i :class="autoPlayActive ? 'fa-solid fa-stop' : 'fa-solid fa-robot'" class="text-xl mb-1"></i>
-                    <span class="text-[10px] font-bold">Auto</span>
+                    <span class="text-[9px] uppercase font-bold">Auto</span>
                 </button>
 
-                <!-- NEXT BUTTON -->
-                <button @click="nextCard" class="col-span-3 bg-primary text-white rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
-                    <span class="font-bold">Next Card</span>
-                    <i class="fa-solid fa-arrow-right"></i>
+                <!-- ADD CARD (Main Action) -->
+                <button @click="addCard" 
+                        class="col-span-2 bg-accent hover:bg-[#b08d65] text-gray-900 rounded-xl shadow-lg shadow-yellow-900/20 flex flex-col items-center justify-center active:scale-95 transition-transform">
+                    <span class="text-lg font-bold font-serif">Play Move</span>
+                    <span class="text-[10px] uppercase tracking-widest opacity-70">
+                        {{ turn === 'w' ? 'Question' : 'Answer' }}
+                    </span>
                 </button>
 
+                <!-- Blindfold Toggle -->
+                <button @click="isBlindfold = !isBlindfold" 
+                        class="col-span-1 flex flex-col items-center justify-center rounded-lg transition-colors py-2"
+                        :class="isBlindfold ? 'bg-blue-900/30 text-blue-400' : 'text-gray-500'">
+                    <i :class="isBlindfold ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'" class="text-xl mb-1"></i>
+                    <span class="text-[9px] uppercase font-bold">Blind</span>
+                </button>
             </div>
         </footer>
+
+        <!-- 4. SETTINGS MODAL -->
+        <div v-if="showSettings" class="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-gray-800 border border-gray-700 rounded-xl w-full max-w-sm overflow-hidden shadow-2xl">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                    <h3 class="font-serif font-bold text-chessLight">Strategy Settings</h3>
+                    <button @click="showSettings = false" class="text-gray-400"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                
+                <div class="p-4 space-y-4">
+                    <!-- Language Selector -->
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase block mb-2">STT Language</label>
+                        <select v-model="selectedLang" class="w-full bg-gray-900 border border-gray-600 text-gray-200 rounded p-2 text-sm">
+                            <option value="en-US">🇺🇸 English (US)</option>
+                            <option value="en-GB">🇬🇧 English (UK)</option>
+                            <option value="de-DE">🇩🇪 German (Deutsch)</option>
+                            <option value="fr-FR">🇫🇷 French (Français)</option>
+                            <option value="es-ES">🇪🇸 Spanish (Español)</option>
+                        </select>
+                    </div>
+
+                    <!-- File Ops -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="saveData" class="py-3 bg-gray-700 rounded hover:bg-gray-600 text-xs font-bold uppercase"><i class="fa-solid fa-download mr-1"></i> Save JSON</button>
+                        <button @click="triggerLoad" class="py-3 bg-gray-700 rounded hover:bg-gray-600 text-xs font-bold uppercase"><i class="fa-solid fa-upload mr-1"></i> Load JSON</button>
+                        <input type="file" id="jsonLoad" class="hidden" accept=".json" @change="loadData">
+                    </div>
+
+                    <button @click="resetAll" class="w-full py-3 border border-red-900/50 text-red-500 rounded text-xs font-bold uppercase hover:bg-red-900/10">
+                        <i class="fa-solid fa-trash mr-1"></i> Reset Campaign
+                    </button>
+                </div>
+            </div>
+        </div>
 
     </div>
 
     <script>
-        const { createApp, ref, onMounted, nextTick, watch } = Vue;
-        const GAME_PGN = `1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#`;
+        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+        // A famous game to loop through visually (Morphy vs Duke)
+        const PGN_SEQUENCE = `1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#`;
 
         createApp({
             setup() {
+                // State
                 const cards = ref([]);
                 const showSettings = ref(false);
-                const isBoardCollapsed = ref(false);
-                const isBlindfold = ref(false); // NEW: Blindfold State
-                const autoPlayActive = ref(false); // NEW: Auto Play State
-                
+                const isBoardExpanded = ref(true);
+                const isBlindfold = ref(false);
+                const autoPlayActive = ref(false);
+                const selectedLang = ref('en-US'); // Default Language
+                const turn = ref('w');
+
+                // Chess Logic
                 const game = new Chess();
                 let board = null;
                 let moveQueue = [];
                 let currentMoveIndex = 0;
+
+                // Utils
                 let timerIntervals = {};
                 let autoPlayInterval = null;
                 let recognition = null;
 
                 onMounted(() => {
-                    initGameLogic();
-                    initBoard();
-                    loadFromStorage();
-                    initSpeechRecognition();
+                    initChess();
+                    loadLocalData();
+                    initSTT();
                 });
 
-                watch(cards, () => saveToStorage(), { deep: true });
+                watch(cards, () => saveLocalData(), { deep: true });
+                watch(selectedLang, () => {
+                    if(recognition) {
+                        recognition.lang = selectedLang.value;
+                        console.log("Language switched to", selectedLang.value);
+                    }
+                });
 
-                function initGameLogic() {
-                    game.load_pgn(GAME_PGN);
+                // --- 1. GAME LOGIC ---
+                function initChess() {
+                    // Pre-load the game for visual effect
+                    game.load_pgn(PGN_SEQUENCE);
                     moveQueue = game.history({ verbose: true });
-                    game.reset();
-                }
-
-                function initBoard() {
-                    board = Chessboard('myBoard', { position: 'start', draggable: false, pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png' });
+                    game.reset(); // clear board
+                    
+                    board = Chessboard('myBoard', {
+                        position: 'start',
+                        draggable: false, // Visual only
+                        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+                    });
+                    
                     window.addEventListener('resize', board.resize);
                 }
 
-                function initSpeechRecognition() {
-                    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                        recognition = new SpeechRecognition();
-                        recognition.continuous = true;
-                        recognition.interimResults = true;
-                        recognition.lang = 'en-US';
-                    }
-                }
-
-                // --- CORE LOGIC ---
-                function nextCard() {
+                function addCard() {
+                    // 1. Advance Chess Board Visual
                     if (currentMoveIndex < moveQueue.length) {
-                        const move = moveQueue[currentMoveIndex];
-                        game.move(move);
+                        game.move(moveQueue[currentMoveIndex]);
                         board.position(game.fen());
-                        
-                        // Add Card
-                        const type = (currentMoveIndex % 2 === 0) ? 'q' : 'a'; // White=Question, Black=Answer
-                        cards.value.push({
-                            id: Date.now(), type, text: '', spokenText: '',
-                            similarity: 0, isListening: false, seconds: 0, 
-                            timerActive: true, // Auto start timer on new card
-                            revealed: false // For Blindfold
-                        });
-                        
-                        // Start timer logic
-                        const idx = cards.value.length - 1;
-                        toggleTimer(idx, true); // Force start
-
                         currentMoveIndex++;
-                        scrollToBottom();
                     } else {
-                        autoPlayActive.value = false; // Stop auto if game ends
-                        clearInterval(autoPlayInterval);
-                        alert("Session Complete!");
+                        // Loop game or just flip turn visually
+                        // For simplicity, just flip turn state
                     }
-                }
-
-                // --- NEW: AUTO PLAY ---
-                function toggleAutoPlay() {
-                    autoPlayActive.value = !autoPlayActive.value;
-                    if (autoPlayActive.value) {
-                        // Advance every 5 seconds (simulating rapid fire)
-                        nextCard(); // immediate
-                        autoPlayInterval = setInterval(() => {
-                            nextCard();
-                        }, 5000); 
-                    } else {
-                        clearInterval(autoPlayInterval);
-                    }
-                }
-
-                // --- STT & SIMILARITY ---
-                function toggleSTT(index) {
-                    if (!recognition) return alert("STT not supported");
-                    const card = cards.value[index];
-                    if (card.isListening) {
-                        recognition.stop();
-                        card.isListening = false;
-                    } else {
-                        cards.value.forEach(c => c.isListening = false); // Stop others
-                        card.isListening = true;
-                        recognition.start();
-                        recognition.onresult = (e) => {
-                            let t = '';
-                            for (let i = e.resultIndex; i < e.results.length; ++i) t += e.results[i][0].transcript;
-                            card.spokenText = t;
-                            calcSim(index);
-                        };
-                        recognition.onend = () => { if(card.isListening) recognition.start(); }; // Continuous loop
-                    }
-                }
-
-                function calcSim(index) {
-                    const c = cards.value[index];
-                    const s1 = new Set(c.text.toLowerCase().match(/\w+/g) || []);
-                    const s2 = new Set(c.spokenText.toLowerCase().match(/\w+/g) || []);
-                    if(s1.size === 0 || s2.size === 0) { c.similarity = 0; return; }
-                    const intersection = new Set([...s1].filter(x => s2.has(x)));
-                    const union = new Set([...s1, ...s2]);
-                    c.similarity = Math.round((intersection.size / union.size) * 100);
-                }
-
-                // --- TIMERS ---
-                function toggleTimer(index, forceStart = false) {
-                    const card = cards.value[index];
-                    if (timerIntervals[card.id]) clearInterval(timerIntervals[card.id]);
                     
-                    if (card.timerActive && !forceStart) {
+                    turn.value = game.turn();
+
+                    // 2. Add Data Card
+                    // Logic: Even moves (0, 2...) are White (Question), Odd are Black (Answer)
+                    // Note: moveQueue index 0 is White's first move.
+                    const isWhite = (currentMoveIndex % 2 !== 0); // After increment, if 1 (odd), it was white's move
+                    
+                    cards.value.push({
+                        id: Date.now(),
+                        type: isWhite ? 'q' : 'a', 
+                        text: '',
+                        spokenText: '',
+                        similarity: 0,
+                        seconds: 0,
+                        timerActive: false,
+                        isEditingTime: false,
+                        isListening: false,
+                        revealed: false
+                    });
+
+                    scrollToBottom();
+                }
+
+                function deleteCard(index) {
+                    if(!confirm("Remove this strategic line?")) return;
+                    cards.value.splice(index, 1);
+                    // Note: We do NOT rollback the chess board to keep logic simple. 
+                    // The board is a metaphor, not a database constraint.
+                }
+
+                // --- 2. TIMERS & EDITING ---
+                function toggleTimer(index) {
+                    const card = cards.value[index];
+                    if (card.timerActive) {
+                        clearInterval(timerIntervals[card.id]);
                         card.timerActive = false;
                     } else {
                         card.timerActive = true;
                         timerIntervals[card.id] = setInterval(() => card.seconds++, 1000);
                     }
                 }
-                function formatTime(s) { return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }
 
-                // --- UTILS ---
-                function updateText(e, i) { cards.value[i].text = e.target.innerText; }
-                function scrollToBottom() { nextTick(() => { const el = document.getElementById('mainScroll'); el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); }); }
-                
-                function saveToStorage() { localStorage.setItem('intData', JSON.stringify({cards: cards.value, fen: game.fen(), idx: currentMoveIndex})); }
-                function loadFromStorage() {
-                    const d = JSON.parse(localStorage.getItem('intData'));
-                    if(d) { cards.value = d.cards; game.load(d.fen); board.position(d.fen); currentMoveIndex = d.idx; cards.value.forEach(c => c.timerActive=false); }
+                function editTimer(index) {
+                    cards.value[index].isEditingTime = true;
+                    // Focus input on next tick
+                    nextTick(() => {
+                        const inputs = document.querySelectorAll('input[type="number"]');
+                        if(inputs.length) inputs[inputs.length-1].focus();
+                    });
                 }
-                function resetAll() { if(confirm("Reset?")) { cards.value = []; game.reset(); currentMoveIndex=0; board.start(); localStorage.removeItem('intData'); showSettings.value=false; } }
-                function downloadData() { 
+
+                function formatTime(s) {
+                    const m = Math.floor(s / 60);
+                    const sec = s % 60;
+                    return `${m}:${sec.toString().padStart(2, '0')}`;
+                }
+
+                // --- 3. STT (GERMAN SUPPORT) ---
+                function initSTT() {
+                    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        recognition = new SpeechRecognition();
+                        recognition.continuous = true;
+                        recognition.interimResults = true;
+                        recognition.lang = selectedLang.value; // Set initial lang
+                    }
+                }
+
+                function toggleSTT(index) {
+                    if (!recognition) return alert("Browser does not support Speech API");
+                    
+                    const card = cards.value[index];
+                    
+                    if (card.isListening) {
+                        recognition.stop();
+                        card.isListening = false;
+                    } else {
+                        // Stop others
+                        cards.value.forEach(c => c.isListening = false);
+                        
+                        // Config & Start
+                        recognition.lang = selectedLang.value; // Ensure current lang is used
+                        card.isListening = true;
+                        recognition.start();
+
+                        recognition.onresult = (e) => {
+                            let transcript = '';
+                            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                                transcript += e.results[i][0].transcript;
+                            }
+                            card.spokenText = transcript;
+                            calculateSimilarity(card);
+                        };
+
+                        recognition.onend = () => {
+                            if (card.isListening) recognition.start(); // Auto restart
+                        };
+                    }
+                }
+
+                function calculateSimilarity(card) {
+                    if(!card.text || !card.spokenText) return;
+                    
+                    // Simple Tokenizer (works for DE/EN)
+                    const normalize = (str) => str.toLowerCase().replace(/[^\p{L}\s]/gu, '').split(/\s+/);
+                    const s1 = new Set(normalize(card.text));
+                    const s2 = new Set(normalize(card.spokenText));
+                    
+                    const intersection = new Set([...s1].filter(x => s2.has(x)));
+                    const union = new Set([...s1, ...s2]);
+                    
+                    card.similarity = Math.round((intersection.size / union.size) * 100);
+                }
+
+                // --- 4. DATA & UTILS ---
+                function toggleAutoPlay() {
+                    autoPlayActive.value = !autoPlayActive.value;
+                    if(autoPlayActive.value) {
+                        addCard(); // Immediate
+                        autoPlayInterval = setInterval(addCard, 4000);
+                    } else {
+                        clearInterval(autoPlayInterval);
+                    }
+                }
+
+                function scrollToBottom() {
+                    nextTick(() => {
+                        const el = document.getElementById('scrollContainer');
+                        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                    });
+                }
+
+                const calculateElo = computed(() => {
+                    const base = 800;
+                    const bonus = cards.value.length * 10;
+                    const accuracyBonus = cards.value.reduce((acc, c) => acc + (c.similarity || 0), 0);
+                    return base + bonus + Math.floor(accuracyBonus / 5);
+                });
+
+                function getScoreColor(score) {
+                    if(score > 75) return 'text-green-500';
+                    if(score > 40) return 'text-yellow-500';
+                    return 'text-red-500';
+                }
+
+                // Storage
+                function saveLocalData() {
+                    const payload = { cards: cards.value, fen: game.fen(), idx: currentMoveIndex, lang: selectedLang.value };
+                    localStorage.setItem('gambitData', JSON.stringify(payload));
+                }
+                function loadLocalData() {
+                    const d = JSON.parse(localStorage.getItem('gambitData'));
+                    if(d) {
+                        cards.value = d.cards;
+                        game.load(d.fen);
+                        board.position(d.fen);
+                        currentMoveIndex = d.idx;
+                        if(d.lang) selectedLang.value = d.lang;
+                        cards.value.forEach(c => c.timerActive = false); // pause all
+                    }
+                }
+                function saveData() {
                     const blob = new Blob([JSON.stringify(cards.value)], {type:'application/json'});
-                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='interview.json'; a.click();
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'gambit_strategy.json'; a.click();
                 }
-                function triggerLoad() { document.getElementById('fileInput').click(); }
-                function loadFromFile(e) { 
-                    const r = new FileReader(); r.onload = ev => { try { cards.value = JSON.parse(ev.target.result); showSettings.value=false; } catch(e){ alert("Invalid"); } };
+                function triggerLoad() { document.getElementById('jsonLoad').click(); }
+                function loadData(e) {
+                    const r = new FileReader();
+                    r.onload = ev => { cards.value = JSON.parse(ev.target.result); showSettings.value = false; };
                     r.readAsText(e.target.files[0]);
+                }
+                function resetAll() {
+                    if(confirm("Forfeit current game?")) {
+                        cards.value = [];
+                        game.reset();
+                        currentMoveIndex = 0;
+                        board.start();
+                        localStorage.removeItem('gambitData');
+                        showSettings.value = false;
+                    }
                 }
 
                 return {
-                    cards, isBoardCollapsed, showSettings, isBlindfold, autoPlayActive,
-                    nextCard, toggleAutoPlay, toggleSTT, toggleTimer, formatTime, updateText,
-                    downloadData, resetAll, triggerLoad, loadFromFile
+                    cards, isBoardExpanded, isBlindfold, showSettings, autoPlayActive, selectedLang, turn,
+                    addCard, deleteCard, toggleTimer, editTimer, formatTime, 
+                    toggleSTT, getScoreColor, calculateElo, toggleAutoPlay,
+                    resetAll, saveData, loadData, triggerLoad
                 };
             }
         }).mount('#app');
