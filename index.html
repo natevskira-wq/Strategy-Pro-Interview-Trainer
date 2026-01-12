@@ -178,6 +178,11 @@
                                 <button v-if="card.spokenText" @click="copySpokenToMain(index)" class="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded uppercase font-bold shadow-md transition-all active:scale-95" title="Promote to Answer">
                                     <i class="fa-solid fa-arrow-up mr-1"></i> Use
                                 </button>
+
+                                <!-- CLEAR STT BUTTON (New) -->
+                                <button v-if="card.spokenText" @click="clearSTT(index)" class="w-8 h-8 rounded-full bg-gray-700 hover:bg-red-500 text-gray-300 hover:text-white flex items-center justify-center transition-colors shadow-md" title="Clear Transcript">
+                                    <i class="fa-solid fa-eraser text-xs"></i>
+                                </button>
                                 
                                 <!-- MIC BUTTON -->
                                 <button @click="toggleSTT(index)" 
@@ -384,7 +389,7 @@
                     if(confirm("Delete this strategic line?")) cards.value.splice(index, 1);
                 }
 
-                // --- 3. STT LOGIC (FIXED) ---
+                // --- 3. STT LOGIC ---
                 function initSTT() {
                     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -409,12 +414,7 @@
                         card.isListening = true;
                         recognition.lang = selectedLang.value;
 
-                        // STT GLITCH FIX:
-                        // 1. Snapshot existing text (Base)
-                        // 2. Only append current session transcript to Base
-                        // 3. Update Base on End/Restart
                         let baseText = card.spokenText ? card.spokenText.trim() : '';
-
                         recognition.start();
 
                         recognition.onresult = (e) => {
@@ -422,7 +422,6 @@
                             for (let i = 0; i < e.results.length; ++i) {
                                 currentSessionTranscript += e.results[i][0].transcript;
                             }
-                            // Append space only if there was previous text
                             const separator = baseText.length > 0 ? ' ' : '';
                             card.spokenText = baseText + separator + currentSessionTranscript;
                             calculateSimilarity(card);
@@ -430,7 +429,6 @@
 
                         recognition.onend = () => {
                             if (card.isListening) {
-                                // Update Snapshot so next loop appends correctly
                                 baseText = card.spokenText;
                                 recognition.start();
                             }
@@ -441,7 +439,6 @@
                 function copySpokenToMain(index) {
                     const card = cards.value[index];
                     card.text = card.spokenText;
-                    // Force resize of textarea
                     nextTick(() => {
                          const txt = document.querySelectorAll('textarea');
                          txt.forEach(t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; });
@@ -449,8 +446,20 @@
                     calculateSimilarity(card);
                 }
 
+                function clearSTT(index) {
+                    if(confirm("Clear current transcript?")) {
+                        const card = cards.value[index];
+                        card.spokenText = '';
+                        calculateSimilarity(card);
+                    }
+                }
+
                 function calculateSimilarity(card) {
-                    if(!card.text || !card.spokenText) return;
+                    if(!card.text || !card.spokenText) {
+                        // If one is empty, score is 0
+                        card.similarity = 0;
+                        return;
+                    }
                     const normalize = (s) => s.toLowerCase().replace(/[^\p{L}\s]/gu, '').split(/\s+/);
                     const s1 = new Set(normalize(card.text));
                     const s2 = new Set(normalize(card.spokenText));
@@ -477,9 +486,9 @@
                 const calculateElo = computed(() => 800 + (cards.value.length*10) + Math.floor(cards.value.reduce((a,c)=>a+(c.similarity||0),0)/5));
 
                 // --- 5. STORAGE ---
-                function saveLocalData() { localStorage.setItem('gambitDataV32', JSON.stringify({cards:cards.value, fen:game.fen(), idx:currentMoveIndex})); }
+                function saveLocalData() { localStorage.setItem('gambitDataV33', JSON.stringify({cards:cards.value, fen:game.fen(), idx:currentMoveIndex})); }
                 function loadLocalData() {
-                    const d = JSON.parse(localStorage.getItem('gambitDataV32'));
+                    const d = JSON.parse(localStorage.getItem('gambitDataV33'));
                     if(d) { cards.value=d.cards; game.load(d.fen); if(board) board.position(d.fen); currentMoveIndex=d.idx; cards.value.forEach(c=>c.timerActive=false); }
                 }
                 function saveData() { 
@@ -488,13 +497,13 @@
                 }
                 function triggerLoad() { document.getElementById('jsonLoad').click(); }
                 function loadData(e) { const r=new FileReader(); r.onload=ev=>{ cards.value=JSON.parse(ev.target.result); showSettings.value=false; }; r.readAsText(e.target.files[0]); }
-                function resetAll() { if(confirm("Reset Campaign?")) { cards.value=[]; game.reset(); currentMoveIndex=0; if(board) board.start(); localStorage.removeItem('gambitDataV32'); showSettings.value=false; } }
+                function resetAll() { if(confirm("Reset Campaign?")) { cards.value=[]; game.reset(); currentMoveIndex=0; if(board) board.start(); localStorage.removeItem('gambitDataV33'); showSettings.value=false; } }
 
                 return {
                     cards, showSettings, isBlindfold, autoPlayActive, selectedLang, turn, boardHeight,
                     startDrag, toggleBoard, autoResize,
                     addCard, deleteCard, toggleTimer, editTimer, formatTime, 
-                    toggleSTT, copySpokenToMain, calculateElo, toggleAutoPlay,
+                    toggleSTT, copySpokenToMain, clearSTT, calculateElo, toggleAutoPlay,
                     resetAll, saveData, loadData, triggerLoad
                 };
             }
